@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8">
-  <title>pywebedit :: Code python in the browser (offline)</title>
+  <title>pywebedit :: Code python in the browser, even offline</title>
 
   <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython.min.js"> </script>
   <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython_stdlib.js"> </script>
@@ -17,15 +17,19 @@
 
   <!-- Simple styling to get the tight layout we want. -->
   <style>
-      body     { background-color: #f7f7f7 }
+      body     { background-color: #f7f7f7;
+                 margin: 4px; }
       .row     { display: flex;
-                 gap: 8px; }
+                 gap: 6px; }
       .column  { flex: 50%; }
       .toolbar { height: 20px;
-                 align-items: flex-end; }
-      .content { height: calc(100vh - 20px - 8px - 8px);
+                 align-items: flex-end;
+                 padding-bottom: 2px; }
+      .help    { justify-content: flex-end; }
+      .content { height: calc(100vh - 20px - 4px - 4px - 2px);
                  overflow-y: scroll; }
-      .help    { margin-left: auto; order: 2; }
+      .mainbtn { font-weight: bold; }
+      .title   { font-family: monospace; }
   </style>
 </head>
 
@@ -33,18 +37,22 @@
   <div class="row">
     <div class="column">
       <div class="row toolbar">
-        <button> Run </button>
+        <button id="btnrun" class="mainbtn"> Run </button>
         <button> Open </button>
         <button> Save </button>
         <button> Save As </button>
+        <div class="title">&lt;pywebedit&gt;</div>
       </div>
       <div class="content" id="html_editor">
       </div>
     </div>
 
     <div class="column">
-      <div class="row toolbar">
-        <button class="help" id="btnhelp"> Help </button>
+      <div class="row toolbar help">
+        <select name="examples" id="examples">
+          <option value="None">Load example...</option>
+        </select>
+        <button id="btnhelp"> Help </button>
       </div>
       <div class="content" id="python_editor">
       </div>
@@ -55,6 +63,8 @@
 
 from browser import document, window, bind
 from browser.widgets.dialog import InfoDialog
+
+BRYTHON_VERSION = '3.13.0'
 
 INITIAL_HTML = """
 <!-- Write HTML on this side -->
@@ -67,7 +77,8 @@ from browser import document
 document['text'].textContent='Hello, World!'
 """.strip()
 
-HELP = """
+HELP = f"""
+<h2 class="title">pywebedit</h2>
 <div>
   Keys:
   <ul>
@@ -76,12 +87,61 @@ HELP = """
 </div>
 
 <div>
-  Additional info:
+  Links:
   <ul>
-    <li>Brython</li>
-    <li>Python</li>
+    <li><a href="https://github.com/cwag-gh/pywebedit/">pywebedit source</a></li>
+    <li><a href="https://www.brython.info/">Brython</a> (using v{BRYTHON_VERSION})</li>
+    <li><a href="https://www.python.org/">Python</a></li>
   </ul>
 </div>
+"""
+
+# Template for generated final page. Do not include script
+# tags, which screws up the html in python in html. Use
+# alternate replacement syntax (other than format()) to
+# avoid syntax conflicts.
+PAGE_TEMPLATE = """
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+%script% type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@%brython_version%/brython.min.js">%endscript%
+%script% type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@%brython_version%/brython_stdlib.js">%endscript%
+
+%script% type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+  setTimeout(function (){
+     brython({debug:1, ids:["pythoncode"]});
+     }, 10);
+}
+%endscript%
+</head>
+
+<body onload="__brython_pre_then_code()">
+%html_body%
+
+%script% type="text/python" id="brythonpre">
+from browser import document
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\\n" + msg)
+sys.stderr = __ErrorReporter()
+%endscript%
+
+%script% type="text/python" id="pythoncode">
+%python_code%
+%endscript%
+%script%> __brython_pre_then_code() %endscript%
+</body>
+</html>
 """
 
 html_editor = window.CodeMirror(document['html_editor'], {
@@ -103,9 +163,31 @@ python_editor = window.CodeMirror(document['python_editor'], {
     'extraKeys': {'Ctrl-/': 'toggleComment'}})
 python_editor.setSize('100%', '100%')
 
+app_window = None
+
 @bind(document['btnhelp'], 'click')
 def on_help(_):
-    d = InfoDialog("pywebedit help", HELP, ok="Ok")
+    d = InfoDialog("Help", HELP, ok="Ok")
+
+@bind(document['btnrun'], 'click')
+def on_run(_):
+    global app_window
+    if app_window is not None:
+        app_window.close()
+    app_window = window.open()
+    app_window.document.write(build_html())
+
+def build_html():
+    """Build the full html text, inserting the user editable sections into the template."""
+    tagmap = {'brython_version': BRYTHON_VERSION,
+              'html_body':       html_editor.getValue(),
+              'python_code':     python_editor.getValue(),
+              'script':          '<' + 'script',
+              'endscript':       '<' + '/script>'}
+    p = PAGE_TEMPLATE
+    for key, value in tagmap.items():
+        p = p.replace('%' + key + '%', value)
+    return p
 
 </script>
 
