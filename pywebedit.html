@@ -38,9 +38,9 @@
     <div class="column">
       <div class="row toolbar">
         <button id="btnrun" class="mainbtn"> Run </button>
-        <button> Open </button>
-        <button> Save </button>
-        <button> Save As </button>
+        <button id="btnopen"> Open </button>
+        <button id="btnsave"> Save </button>
+        <button id="btnsaveas"> Save As </button>
         <div class="title">&lt;pywebedit&gt;</div>
       </div>
       <div class="content" id="html_editor">
@@ -61,21 +61,27 @@
 
 <script type="text/python">
 
-from browser import document, window, bind
+# Main python code
+
+from browser import document, window, bind, aio, console
 from browser.widgets.dialog import InfoDialog
 
+
 BRYTHON_VERSION = '3.13.0'
+
 
 INITIAL_HTML = """
 <!-- Write HTML on this side -->
 <h1 id='text'></h1>
 """.strip()
 
+
 INITIAL_PYTHON = """
 # Write python on this side
 from browser import document
 document['text'].textContent='Hello, World!'
 """.strip()
+
 
 HELP = f"""
 <h2 class="title">pywebedit</h2>
@@ -123,6 +129,7 @@ function __brython_pre_then_code() {
 
 %script% type="text/python" id="brythonpre">
 from browser import document
+
 import sys
 class __ErrorReporter:
     def __init__(self):
@@ -154,6 +161,7 @@ html_editor = window.CodeMirror(document['html_editor'], {
     'extraKeys': {'Ctrl-/': 'toggleComment'}})
 html_editor.setSize('100%', '100%')
 
+
 python_editor = window.CodeMirror(document['python_editor'], {
     'lineNumbers': True,
     'value': INITIAL_PYTHON,
@@ -163,11 +171,15 @@ python_editor = window.CodeMirror(document['python_editor'], {
     'extraKeys': {'Ctrl-/': 'toggleComment'}})
 python_editor.setSize('100%', '100%')
 
+
 app_window = None
+file_handle = None
+
 
 @bind(document['btnhelp'], 'click')
 def on_help(_):
     d = InfoDialog("Help", HELP, ok="Ok")
+
 
 @bind(document['btnrun'], 'click')
 def on_run(_):
@@ -176,6 +188,51 @@ def on_run(_):
         app_window.close()
     app_window = window.open()
     app_window.document.write(build_html())
+
+
+@bind(document['btnopen'], 'click')
+def on_open(_):
+    # Need this intermediate to run async functions
+    aio.run(open_html())
+
+
+async def pick_file():
+    global file_handle
+    try:
+        file_handles = await window.showOpenFilePicker()
+        if len(file_handles) > 0:
+            file_handle = file_handles[0]
+            return True
+    except AttributeError:
+        d = InfoDialog("Unfortunately...",
+                       "This browser does not support opening and saving local files. Try Chrome.",
+                       ok="Ok")
+    return False
+
+
+async def open_html():
+    """Pick a file, then load it."""
+    global file_handle
+    success = await pick_file()
+    if not success:
+        return
+    f = await file_handle.getFile()
+    contents = await f.text()
+    body, script = split_html(contents)
+    html_editor.setValue(body)
+    python_editor.setValue(script)
+    #document.getElementById('filename').innerHTML = file_handle.name;
+    document.title = f'<pywebedit> :: {file_handle.name}'
+
+
+def split_html(contents):
+    """Split out header, python script out of saved html."""
+    body_and_script = contents.split('<body onload="__brython_pre_then_code()">')[1]
+    body = body_and_script.split('<' + 'script type="text/python" id="brythonpre">')[0].strip()
+    script_and_foot = body_and_script.split('<' + 'script type="text/python" id="pythoncode">')[1]
+    script = script_and_foot.split('<' + '/script>')[0].strip()
+    return body, script
+
 
 def build_html():
     """Build the full html text, inserting the user editable sections into the template."""
@@ -189,7 +246,55 @@ def build_html():
         p = p.replace('%' + key + '%', value)
     return p
 
-</script>
 
+# def save_data_to_file(data, filename, type):
+#     blob = window.Blob
+#     file = blob.new([data], {'type': type})
+#     if window.navigator.msSaveOrOpenBlob: # IE10+
+#         window.navigator.msSaveOrOpenBlob(file, filename)
+#     else: # Others
+#         a = document.createElement('a')
+#         url = window.URL.createObjectURL(file)
+#         a.href = url
+#         a.download = filename
+#         document.body.appendChild(a)
+#         a.click()
+#         def remove_url():
+#             document.body.removeChild(a)
+#             window.URL.revokeObjectURL(url)
+#         window.setTimeout(remove_url, 0)
+
+
+async def write_file(contents):
+    global file_handle
+    assert file_handle is not None
+    writable = await file_handle.createWritable()
+    await writable.write(contents)
+    await writable.close()
+
+
+@bind(document['btnsave'], 'click')
+def on_save(_):
+    aio.run(save_file(False))
+
+
+@bind(document['btnsaveas'], 'click')
+def on_save_as(_):
+    aio.run(save_file(True))
+
+
+async def save_file(with_picker):
+    global file_handle
+    if file_handle is None or with_picker:
+        success = await pick_file()
+        if not success:
+            return
+    await write_file(build_html())
+
+
+# Auto close child window if main window is closed
+window.addEventListener('beforeunload', lambda e: app_window.close() if app_window else None)
+
+</script>
 </body>
 </html>
