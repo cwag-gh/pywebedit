@@ -196,10 +196,29 @@ def on_open(_):
     aio.run(open_html())
 
 
-async def pick_file():
+async def pick_file_for_saving():
+    return await _pick_file(True)
+
+
+async def pick_existing_file():
+    return await _pick_file(False)
+
+
+async def _pick_file(for_saving):
     global file_handle
     try:
-        file_handles = await window.showOpenFilePicker()
+        if for_saving:
+            name = 'myprogram.html'
+            if file_handle is not None:
+                name = file_handle.name
+            file_handles = await window.showSaveFilePicker({
+               'id': 'choosefile', # Use same id between pickers to save folder
+               'suggestedName': name,
+               'types': [{'description': 'Text documents',
+                          'accept': {'text/html': ['.html']}}]})
+        else:
+            file_handles = await window.showOpenFilePicker({
+               'id': 'choosefile'}) # Use same id between pickers to save folder
         if len(file_handles) > 0:
             file_handle = file_handles[0]
             return True
@@ -213,7 +232,7 @@ async def pick_file():
 async def open_html():
     """Pick a file, then load it."""
     global file_handle
-    success = await pick_file()
+    success = await pick_existing_file()
     if not success:
         return
     f = await file_handle.getFile()
@@ -286,7 +305,7 @@ def on_save_as(_):
 async def save_file(with_picker):
     global file_handle
     if file_handle is None or with_picker:
-        success = await pick_file()
+        success = await pick_file_for_saving()
         if not success:
             return
     await write_file(build_html())
