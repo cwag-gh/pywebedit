@@ -41,7 +41,7 @@
         <button id="btnopen"> Open </button>
         <button id="btnsave"> Save </button>
         <button id="btnsaveas"> Save As </button>
-        <div class="title">&lt;pywebedit&gt;</div>
+        <div id="filename" class="title">&lt;pywebedit&gt;</div>
       </div>
       <div class="content" id="html_editor">
       </div>
@@ -240,8 +240,10 @@ async def open_html():
     body, script = split_html(contents)
     html_editor.setValue(body)
     python_editor.setValue(script)
-    #document.getElementById('filename').innerHTML = file_handle.name;
-    document.title = f'<pywebedit> :: {file_handle.name}'
+    title = f'&lt;pywebedit&gt; :: {file_handle.name}'
+    document.getElementById('filename').innerHTML = title
+    document.title = title
+    console.log(f'Opened {file_handle.name}. Body {len(body)} chars, python {len(script)} chars.')
 
 
 def split_html(contents):
