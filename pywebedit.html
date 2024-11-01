@@ -242,6 +242,12 @@ async def _pick_file(for_saving):
     return False
 
 
+def update_title():
+    global file_handle
+    document.getElementById('filename').innerHTML = f'&lt;pywebedit&gt; {file_handle.name}'
+    document.title = f'<pywebedit> {file_handle.name}'
+
+
 async def open_html():
     """Pick a file, then load it."""
     global file_handle
@@ -253,8 +259,7 @@ async def open_html():
     body, script = split_html(contents)
     html_editor.setValue(body)
     python_editor.setValue(script)
-    document.getElementById('filename').innerHTML = f'&lt;pywebedit&gt; {file_handle.name}'
-    document.title = f'<pywebedit> {file_handle.name}'
+    update_title()
     console.log(f'Opened {file_handle.name}. Body {len(body)} chars, python {len(script)} chars.')
 
 
@@ -322,6 +327,7 @@ async def save_file(with_picker):
         success = await pick_file_for_saving()
         if not success:
             return
+    update_title()
     await write_file(build_html())
 
 
