@@ -256,7 +256,14 @@ async def open_html():
         return
     f = await file_handle.getFile()
     contents = await f.text()
-    body, script = split_html(contents)
+    try:
+        body, script = split_html(contents)
+    except Exception as e:
+        d = InfoDialog("Error",
+                       "Looks like this file was not saved by pywebedit. Unable to load.",
+                       ok="Ok")
+        console.log(e)
+        return
     html_editor.setValue(body)
     python_editor.setValue(script)
     update_title()
