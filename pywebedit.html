@@ -184,8 +184,13 @@ def on_help(_):
 @bind(document['btnrun'], 'click')
 def on_run(_):
     global app_window
-    if app_window is not None:
-        app_window.close()
+    try:
+        if app_window:
+            app_window.close()
+    except:
+        # Weird error in Chrome when someone reloads the generated tab,
+        # and we then can't access it
+        pass
     app_window = window.open()
     app_window.document.write(build_html())
 
