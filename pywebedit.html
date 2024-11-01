@@ -189,6 +189,13 @@ def on_run(_):
     app_window = window.open()
     app_window.document.write(build_html())
 
+    # Download to a file - user has to click on it, but works
+    # blob = window.Blob.new([build_html()], {'type': 'text/html' })
+    # a = document.createElement('a')
+    # a.href = window.URL.createObjectURL(blob)
+    # a.download = 'generated.html'
+    # a.click()
+
 
 @bind(document['btnopen'], 'click')
 def on_open(_):
@@ -223,6 +230,7 @@ async def _pick_file(for_saving):
             file_handle = file_handles[0]
             return True
     except AttributeError:
+        # TODO: should be able to handle local saving using download to a file approach
         d = InfoDialog("Unfortunately...",
                        "This browser does not support opening and saving local files. Try Chrome.",
                        ok="Ok")
