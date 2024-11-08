@@ -1,0 +1,109 @@
+
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython.min.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython_stdlib.js"></script>
+
+<script type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+  setTimeout(function (){
+     brython({debug:1, ids:["pythoncode"]});
+     }, 10);
+}
+</script>
+</head>
+
+<body onload="__brython_pre_then_code()">
+<!-- You can use style tags on this side 
+     to control the appearance with CSS -->
+<style>
+    *{
+        font-family: sans-serif;
+        font-weight: normal;
+        font-size: 1.1em;
+     }
+    td{
+        background-color: #ccc;
+        padding: 10px 30px 10px 30px;
+        border-radius: 0.2em;
+        text-align: center;
+        cursor: default;
+    }
+    #result{
+        border-color: #000;
+        border-width: 1px;
+        border-style: solid;
+        padding: 10px 30px 10px 30px;
+        text-align: right;
+    }
+</style>
+
+<!-- For this example, all of the HTML is 
+     generated with python -->
+
+<script type="text/python" id="brythonpre">
+from browser import document
+
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\n" + msg)
+sys.stderr = __ErrorReporter()
+</script>
+
+<script type="text/python" id="pythoncode">
+from browser import document, html
+
+# Construct the calculator
+calc = html.TABLE()
+calc <= html.TR(html.TH(html.DIV("0", id="result"), colspan=3) +
+                html.TD("C"))
+lines = ["789/", "456*", "123-", "0.=+"]
+
+calc <= (html.TR(html.TD(x) for x in line) for line in lines)
+
+document <= calc
+
+result = document["result"] # Direct access to an element by its id
+
+def action(event):
+    """Handles the "click" event on a calculator button."""
+    # The element the user clicked on is the "target" attribute of
+    # the event object
+    element = event.target
+    # The text displayed on the button is the "text" attribute of the element
+    value = element.text
+    if value not in "=C":
+        # Update the content of the "result" area
+        if result.text in ["0", "error"]:
+            result.text = value
+        else:
+            result.text = result.text + value
+    elif value == "C":
+        # Reset to zero
+        result.text = "0"
+    elif value == "=":
+        # Execute the entered formula
+        try:
+            x = eval(result.text)
+            result.text = x
+        except:
+            result.text = "error"
+
+# Associates the action() function with the "click" event on all buttons
+# on the page
+for button in document.select("td"):
+    button.bind("click", action)
+</script>
+<script> __brython_pre_then_code() </script>
+</body>
+</html>

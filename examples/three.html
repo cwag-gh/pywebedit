@@ -1,0 +1,74 @@
+
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython.min.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython_stdlib.js"></script>
+
+<script type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+  setTimeout(function (){
+     brython({debug:1, ids:["pythoncode"]});
+     }, 10);
+}
+</script>
+</head>
+
+<body onload="__brython_pre_then_code()">
+<script 
+src="https://cdnjs.cloudflare.com/ajax/libs/three.js/100/three.min.js">
+</script>
+
+<div id="test"></div>
+
+<script type="text/python" id="brythonpre">
+from browser import document
+
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\n" + msg)
+sys.stderr = __ErrorReporter()
+</script>
+
+<script type="text/python" id="pythoncode">
+from browser import document, window
+
+THREE = window.THREE
+
+camera = THREE.PerspectiveCamera.new(75, 1, 1, 10000)
+camera.position.z = 1000
+scene = THREE.Scene.new()
+geometry = THREE.CubeGeometry.new(200, 200, 200)
+material = THREE.MeshBasicMaterial.new({"color": "#ff0000", "wireframe": True})
+mesh = THREE.Mesh.new(geometry, material)
+scene.add(mesh)
+
+renderer = THREE.WebGLRenderer.new()
+renderer.setSize(444, 444)
+
+document <= renderer.domElement
+renderer.render(scene, camera)
+
+def animate(i):
+    # note: three.js includes requestAnimationFrame shim
+    window.requestAnimationFrame(animate)
+
+    mesh.rotation.x += 0.01
+    mesh.rotation.y += 0.02
+
+    renderer.render(scene, camera)   
+
+animate(0)
+</script>
+<script> __brython_pre_then_code() </script>
+</body>
+</html>

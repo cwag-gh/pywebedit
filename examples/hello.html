@@ -1,0 +1,46 @@
+
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython.min.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython_stdlib.js"></script>
+
+<script type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+  setTimeout(function (){
+     brython({debug:1, ids:["pythoncode"]});
+     }, 10);
+}
+</script>
+</head>
+
+<body onload="__brython_pre_then_code()">
+<!-- Write HTML on this side -->
+<h1 id='text'></h1>
+
+<script type="text/python" id="brythonpre">
+from browser import document
+
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\n" + msg)
+sys.stderr = __ErrorReporter()
+</script>
+
+<script type="text/python" id="pythoncode">
+# Write python on this side
+from browser import document
+document['text'].textContent='Hello, World!'
+</script>
+<script> __brython_pre_then_code() </script>
+</body>
+</html>
