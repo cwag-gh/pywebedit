@@ -52,11 +52,7 @@
 
     <div class="column">
       <div class="row toolbar help">
-        <button id="togglehead">head</button>
-        <button id="togglebody">html</button>
-        <select name="examples" id="examples">
-          <option value="None">Load example...</option>
-        </select>
+        <select name="examples" id="examples"> </select>
         <button id="btnhelp"> Help </button>
       </div>
       <div class="content" id="python_editor">
@@ -68,7 +64,7 @@
 
 # Main python code
 
-from browser import document, window, bind, aio, console
+from browser import document, window, bind, aio, console, html
 from browser.widgets.dialog import InfoDialog
 
 
@@ -156,6 +152,22 @@ sys.stderr = __ErrorReporter()
 </html>
 """
 
+EXAMPLES = {
+    "Interacting with HTML": [
+        ("hello", "Hello world"),
+        ("calculator", "Calculator with styled buttons"),
+        ("sort_table", "Table with sortable columns"),
+    ],
+    "Drawing": [
+        ("clock", "Analog clock"),
+        ("barcode", "Generate barcodes"),
+    ],
+    "Using javascript libraries": [
+        ("three", "three.js (3D animation), basic example"),
+    ]
+}
+
+
 html_editor = window.CodeMirror(document['html_editor'], {
     'lineNumbers': True,
     'value': INITIAL_HTML,
@@ -179,6 +191,30 @@ python_editor.setSize('100%', '100%')
 
 app_window = None
 file_handle = None
+
+
+def add_examples():
+    select = document["examples"]
+
+    # Create and add a default option
+    default_option = html.OPTION("Load example...")
+    default_option.attrs["value"] = ""
+    select <= default_option
+
+    # Iterate through the car data and create groups
+    for group_name, cars in EXAMPLES.items():
+        # Create optgroup
+        group = html.OPTGROUP()
+        group.attrs["label"] = group_name
+
+        # Add options to the group
+        for value, display_text in cars:
+            option = html.OPTION(display_text)
+            option.attrs["value"] = value
+            group <= option
+
+        # Add the group to the select
+        select <= group
 
 
 @bind(document['btnhelp'], 'click')
@@ -348,6 +384,8 @@ async def save_file(with_picker):
 
 # Auto close child window if main window is closed
 window.addEventListener('beforeunload', lambda e: app_window.close() if app_window else None)
+
+add_examples()
 
 </script>
 </body>
