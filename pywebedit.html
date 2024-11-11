@@ -147,7 +147,6 @@ sys.stderr = __ErrorReporter()
 %script% type="text/python" id="pythoncode">
 %python_code%
 %endscript%
-%script%> __brython_pre_then_code() %endscript%
 </body>
 </html>
 """
@@ -234,6 +233,7 @@ def on_run(_):
         pass
     app_window = window.open()
     app_window.document.write(build_html())
+    app_window.document.close()
 
     # Download to a file - user has to click on it, but works
     # blob = window.Blob.new([build_html()], {'type': 'text/html' })
