@@ -72,7 +72,7 @@ def set_clock():
     ctx.fillStyle = "#fff"
     ctx.arc(width / 2, height / 2, ray * 0.89, 0, 2 * math.pi)
     ctx.fill()
-    
+
     # redraw hours
     show_hours()
 
@@ -85,7 +85,7 @@ def set_clock():
     ctx.fillStyle = "#fff"
     ctx.fillText(day, width * 0.7, height * 0.5)
 
-    # draw needles for hour, minute, seconds    
+    # draw needles for hour, minute, seconds
     ctx.lineWidth = 3
     hour = now.hour % 12 + now.minute / 60
     angle = hour * 2 * math.pi / 12 - math.pi / 2
@@ -97,7 +97,7 @@ def set_clock():
     second = now.second + now.microsecond / 1000000
     angle = second * 2 * math.pi / 60 - math.pi / 2
     needle(angle, 0.05, 0.85, "#f00") # in red
-    
+
 browser.timer.set_interval(set_clock, 100)
 
 canvas = doc["clock"]
@@ -143,6 +143,5 @@ def show_hours():
 show_hours()
 set_clock()
 </script>
-<script> __brython_pre_then_code() </script>
 </body>
 </html>

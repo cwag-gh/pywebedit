@@ -22,7 +22,7 @@ body,td,th{
     font-family:sans-serif;
     font-size:12px;
 }
-    
+
 td {
     border-style:solid;
     border-width: 0px 0px 1px 0px;
@@ -45,7 +45,7 @@ a.sort_link{
 }
 </style>
 
-<!-- For this example, all HTML is 
+<!-- For this example, all HTML is
      generated with python -->
 
 <script type="text/python" id="brythonpre">
@@ -154,10 +154,10 @@ link.bind("click", sort_by_col)
 link_num = html.A("\u2191\u2193", href="#", Class="sort_link")
 link_num.bind("click", lambda ev:sort_by_col(ev,True))
 link1 = link.clone()
-title <= html.TH("Country" + link)  
-title <= html.TH("Capital" + link.clone())  
-title <= html.TH("Area" + link_num)  
-title <= html.TH("Population" + link_num.clone())  
+title <= html.TH("Country" + link)
+title <= html.TH("Capital" + link.clone())
+title <= html.TH("Area" + link_num)
+title <= html.TH("Population" + link_num.clone())
 t <= title
 
 rows = []
@@ -177,6 +177,5 @@ foot = html.P()+html.I("Written in " +
     " using " + html.A("pywebedit", href="http://robotfantastic.org/pywebedit"))
 doc <= foot
 </script>
-<script> __brython_pre_then_code() </script>
 </body>
 </html>
