@@ -1,0 +1,228 @@
+
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython.min.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython_stdlib.js"></script>
+
+<script type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+  setTimeout(function (){
+     brython({debug:1, ids:["pythoncode"]});
+     }, 10);
+}
+</script>
+</head>
+
+<body onload="__brython_pre_then_code()">
+<div align="center">
+<canvas id="canvas" 
+        width="1000" 
+        height="800"></canvas>
+</div>
+
+<script type="text/python" id="brythonpre">
+from browser import document
+
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\n" + msg)
+sys.stderr = __ErrorReporter()
+</script>
+
+<script type="text/python" id="pythoncode">
+import math
+from browser import document, window, aio
+
+
+CTX = document['canvas'].getContext('2d')
+WD = document['canvas'].width
+HT = document['canvas'].height
+#CTX.translate(0.5, 0.5) # Trick to make line drawing a bit better
+
+dt = 0.5
+
+xmargin = 200
+ymargin = 30
+a = 150
+b = 200
+c = math.sqrt(a*a + b*b)
+d = a*a / c
+theta = math.atan(a/b)
+
+A = (xmargin + a, ymargin + a + b)
+B = (xmargin + a + b, ymargin + b)
+C = (A[0] + a, A[1] + b)
+D = (B[0] + a, B[1] + b)
+E = (xmargin + a, ymargin + b)
+F = (C[0] + d * math.cos(theta),
+     C[1] - d * math.sin(theta))
+G = (xmargin, ymargin + a + b)
+H = (xmargin + a + b, ymargin)
+I = (xmargin, ymargin + b)
+J = (xmargin + a, ymargin)
+
+
+def draw_line(x1, y1, x2, y2, color='black', width=1):
+    "Draw a line from (x1,y1) to (x2,y2)"
+    CTX.strokeStyle = color
+    CTX.lineWidth = width
+    CTX.beginPath()
+    CTX.moveTo(x1, y1)
+    CTX.lineTo(x2, y2)
+    CTX.stroke()
+
+
+def draw_circle(x, y, radius, color='black', filled=False, width=1):
+    "Draw a circle at (x,y) with given radius"
+    CTX.beginPath()
+    CTX.arc(x, y, radius, 0, math.pi * 2)
+    if (filled):
+        CTX.fillStyle = color
+        CTX.fill()
+    else:
+        CTX.strokeStyle = color
+        CTX.lineWidth = width
+        CTX.stroke()
+
+
+def draw_rect(x, y, width, height, color='black', filled=False, linewidth=1):
+    "Draw a rectangle at (x,y) with given width and height"
+    if (filled):
+        CTX.fillStyle = color
+        CTX.fillRect(x, y, width, height)
+    else:
+        CTX.strokeStyle = color
+        CTX.lineWidth = linewidth
+        CTX.strokeRect(x, y, width, height)
+
+
+def draw_text(text, x, y, color='black', font_size=12, font_family='Arial', 
+              centered=True, bold=False):
+    "Draw text at (x,y)"
+    CTX.fillStyle = color
+    CTX.font = f'{"bold" if bold else ""} {font_size}px {font_family}'
+    if centered: 
+        CTX.textAlign = 'center'
+        CTX.textBaseline = 'middle'
+    else:
+        CTX.textAlign = 'left'
+        CTX.textBaseline = 'alphabetic'
+    CTX.fillText(text, x, y)
+    
+    
+def draw_triangle(p1, p2, p3, color='black', width=1):
+    draw_line(*p1, *p2, color=color, width=width)
+    draw_line(*p2, *p3, color=color, width=width)
+    draw_line(*p3, *p1, color=color, width=width)
+      
+  
+def midpoint(p1, p2):
+    return ((p1[0] + p2[0]) / 2.0,
+            (p1[1] + p2[1]) / 2.0)
+    
+
+def midpoint_label(text, p1, p2, x_off=0, y_off=0, **kwargs):
+    pmid = midpoint(p1, p2)
+    draw_text(text, pmid[0] + x_off, pmid[1] + y_off, **kwargs)
+  
+
+def linterp(p1, p2, fraction):
+    "Return point that is fraction of the distance between p1 and p2"
+    incr = ((p2[0] - p1[0]) * fraction,(p2[1] - p1[1]) * fraction)
+    return (p1[0] + incr[0],
+            p1[1] + incr[1])
+    
+    
+def clear():
+    "Clear the entire canvas"
+    canvas = CTX.canvas
+    CTX.clearRect(0, 0, canvas.width, canvas.height)
+
+
+def title():
+    draw_text("Euclid's proof of the Pythagorean Theorem",
+              WD/2, ymargin / 2, font_size=20)
+    
+    
+def triangle_labels():
+    midpoint_label('b', E, B, y_off=-10)
+    midpoint_label('a', A, E, x_off=-10)
+    midpoint_label('c', A, B, x_off=8, y_off=8)
+    
+    
+async def main():
+    title()
+    triangle_labels()
+    draw_triangle(A, E, B)
+    await aio.sleep(2*dt)
+       
+    # Draw a box
+    draw_line(*G, *I)
+    draw_line(*I, *E)
+    draw_line(*A, *G)
+    await aio.sleep(dt)
+        
+    # Draw b box
+    draw_line(*E, *J)
+    draw_line(*J, *H)
+    draw_line(*H, *B)
+    await aio.sleep(dt)
+    
+    # Draw c box
+    draw_line(*A, *C)
+    draw_line(*C, *D)
+    draw_line(*D, *B)
+    await aio.sleep(2*dt)
+    
+    # Draw bisector
+    n = 50
+    for i in range(1, n+1):
+        start_pct = (i - 1) / n
+        end_pct = i / n
+        draw_line(*linterp(E, F, start_pct), *linterp(E, F, end_pct))
+        await aio.sleep(1/60)
+    await aio.sleep(2*dt)   
+    
+    # Draw congruent triangles
+    clear()
+    title()
+    triangle_labels()
+    # Draw congruent set 1, triangle 1, long side
+    draw_triangle(G, A, B, color='#fceb03', width=2)
+    # Draw congruent set 1, triangle 2, long side
+    draw_triangle(C, A, E, color='cyan')  
+    # Draw congruent set 2, triangle 1, long side
+    draw_triangle(D, B, E, color='blue')   
+    # Draw congruent set 2, triangle 2, long side
+    draw_triangle(A, B, H, color='red') 
+    # Missing lines
+    draw_line(*G, *I)
+    draw_line(*I, *E)
+    draw_line(*E, *J)
+    draw_line(*J, *H)
+    draw_line(*D, *C)
+    draw_line(*E, *F)
+    await aio.sleep(2*dt)
+      
+    fontsize = 220
+    family = 'Arial Narrow'
+    draw_text("QED,",    WD/2, HT/2 - 1.05 * fontsize/2, 
+              font_size=fontsize, font_family=family, bold=True)
+    draw_text("suckers", WD/2, HT/2 + 1.05 * fontsize/2, 
+              font_size=fontsize, font_family=family, bold=True)
+    
+aio.run(main()) 
+# window.requestAnimationFrame(update_and_draw)
+</script>
+</body>
+</html>

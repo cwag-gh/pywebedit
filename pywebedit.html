@@ -157,13 +157,18 @@ EXAMPLES = {
         ("calculator", "Calculator with styled buttons"),
         ("sort_table", "Table with sortable columns"),
     ],
-    "Drawing": [
+    "Drawing and animating": [
         ("clock", "Analog clock"),
         ("barcode", "Generate barcodes"),
+        ("pythagoras", "Animated geometry proof"),
     ],
     "Using javascript libraries": [
         ("three", "three.js (3D animation), basic example"),
-    ]
+    ],
+    "Games": [
+        ("breakout", "Brick breaking"),
+        ("lightcycles", "Lightcycles"),
+    ],
 }
 
 
@@ -190,6 +195,8 @@ python_editor.setSize('100%', '100%')
 
 app_window = None
 file_handle = None
+file_name = None
+buffers_modified = False # Or store originals
 
 
 def add_examples():
@@ -214,6 +221,32 @@ def add_examples():
 
         # Add the group to the select
         select <= group
+
+
+async def load_example(name):
+    try:
+        relative_url = f'./examples/{name}.html'
+        request = await aio.get(relative_url, format='text')
+        if request.status == 200 or request.status == 0:
+            # TODO: check overwrite of modified data
+            if load_html(request.data):
+                set_loaded_file_and_title(None, f'{name}.html')
+                return
+        else:
+            raise RuntimeError(f"HTTP error: status {request.status}")
+    except Exception as e:
+        console.log(str(e))
+        # TODO: Fallback to choosing folder to load local example
+        d = InfoDialog("Unfortunately...",
+                       f"Unable to load {relative_url} from the server.",
+                       ok="Ok")
+    # For all unsuccessful cases, set the combo box back to default
+    document["examples"].value = ''
+
+
+@bind(document['examples'], 'change')
+def on_example_select(evt):
+    aio.run(load_example(evt.target.value))
 
 
 @bind(document['btnhelp'], 'click')
@@ -246,7 +279,7 @@ def on_run(_):
 @bind(document['btnopen'], 'click')
 def on_open(_):
     # Need this intermediate to run async functions
-    aio.run(open_html())
+    aio.run(open_file())
 
 
 async def pick_file_for_saving():
@@ -258,12 +291,12 @@ async def pick_existing_file():
 
 
 async def _pick_file(for_saving):
-    global file_handle
+    global file_handle, file_name
     try:
         if for_saving:
             name = 'myprogram.html'
-            if file_handle is not None:
-                name = file_handle.name
+            if file_name is not None:
+                name = file_name
             handle = await window.showSaveFilePicker({
                'id': 'choosefile', # Use same id between pickers to save folder
                'suggestedName': name,
@@ -271,12 +304,14 @@ async def _pick_file(for_saving):
                           'accept': {'text/html': ['.html']}}]})
             # TODO: check for success
             file_handle = handle
+            file_name = file_handle.name
             return True
         else:
             file_handles = await window.showOpenFilePicker({
                'id': 'choosefile'}) # Use same id between pickers to save folder
             if len(file_handles) > 0:
                 file_handle = file_handles[0]
+                file_name = file_handle.name
                 return True
     except AttributeError:
         # TODO: should be able to handle local saving using download to a file approach
@@ -286,13 +321,23 @@ async def _pick_file(for_saving):
     return False
 
 
-def update_title():
-    global file_handle
-    document.getElementById('filename').innerHTML = f'&lt;pywebedit&gt; {file_handle.name}'
-    document.title = f'<pywebedit> {file_handle.name}'
+def set_loaded_file_and_title(handle=None, title=None):
+    """Single function to set what has been loaded - a file or an example"""
+    global file_handle, file_name
+    file_handle = handle
+    file_name = title
+    if file_name is None:
+        if file_handle is None:
+            # Reset
+            file_name = ''
+        else:
+            file_name = file_handle.name
+    # Set the UI of the title
+    document.getElementById('filename').innerHTML = f'&lt;pywebedit&gt; {file_name}'
+    document.title = f'<pywebedit> {file_name}'
 
 
-async def open_html():
+async def open_file():
     """Pick a file, then load it."""
     global file_handle
     success = await pick_existing_file()
@@ -300,18 +345,25 @@ async def open_html():
         return
     f = await file_handle.getFile()
     contents = await f.text()
+    load_html(contents)
+    console.log(f'Opened {file_handle.name}.')
+    set_loaded_file_and_title(file_handle, file_handle.name)
+
+
+def load_html(contents):
+    """Update the UI given the actual html contents as a string."""
     try:
         body, script = split_html(contents)
     except Exception as e:
+        console.log(e)
         d = InfoDialog("Error",
                        "Looks like this file was not saved by pywebedit. Unable to load.",
                        ok="Ok")
-        console.log(e)
-        return
+        return False
     html_editor.setValue(body)
     python_editor.setValue(script)
-    update_title()
-    console.log(f'Opened {file_handle.name}. Body {len(body)} chars, python {len(script)} chars.')
+    console.log(f'Set body {len(body)} chars, python {len(script)} chars.')
+    return True
 
 
 def split_html(contents):
@@ -373,12 +425,13 @@ def on_save_as(_):
 
 
 async def save_file(with_picker):
-    global file_handle
+    global file_handle, file_name
     if file_handle is None or with_picker:
         success = await pick_file_for_saving()
         if not success:
             return
-    update_title()
+    # A bit lame - this re-sets what is already there just to update the UI
+    set_loaded_file_and_title(file_handle, file_name)
     await write_file(build_html())
 
 
