@@ -266,6 +266,11 @@ def on_help(_):
     d = InfoDialog("Help", HELP, ok="Ok")
 
 
+def replace_all_tabs():
+    """Replaces all tabs with spaces in the python editor."""
+    python_editor.setValue(python_editor.getValue().replace('\t', '    '))
+
+
 @bind(document['btnrun'], 'click')
 def on_run(_):
     global app_window
@@ -276,6 +281,7 @@ def on_run(_):
         # Weird error in Chrome when someone reloads the generated tab,
         # and we then can't access it
         pass
+    replace_all_tabs()
     app_window = window.open()
     app_window.document.write(build_html())
     app_window.document.close()
@@ -437,11 +443,13 @@ async def write_file(contents):
 
 @bind(document['btnsave'], 'click')
 def on_save(_):
+    replace_all_tabs()
     aio.run(save_file(False))
 
 
 @bind(document['btnsaveas'], 'click')
 def on_save_as(_):
+    replace_all_tabs()
     aio.run(save_file(True))
 
 
