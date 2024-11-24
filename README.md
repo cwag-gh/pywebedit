@@ -19,6 +19,7 @@ Build python programs that can run in the browser, from your browser.
 - Inspired by [brython's editor
   example](https://www.brython.info/tests/editor.html?lang=en) and
   [urfdvw's Brython Editor](https://github.com/urfdvw/Brython-Editor)
+- Use monolith to download then reupload a standalone version
 
 ## TODO
 
@@ -32,3 +33,5 @@ Build python programs that can run in the browser, from your browser.
 - Strip tabs (or at least highlight?) in python code editor
 - Find / replace
 - Toggle Header, Body, Code regions
+- Add autosave
+- Fix tabs / spaces
