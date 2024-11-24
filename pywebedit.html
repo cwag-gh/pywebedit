@@ -65,7 +65,7 @@
 # Main python code
 
 from browser import document, window, bind, aio, console, html
-from browser.widgets.dialog import InfoDialog
+from browser.widgets.dialog import InfoDialog, Dialog
 
 
 BRYTHON_VERSION = '3.13.0'
@@ -196,7 +196,8 @@ python_editor.setSize('100%', '100%')
 app_window = None
 file_handle = None
 file_name = None
-buffers_modified = False # Or store originals
+orig_code = INITIAL_PYTHON
+orig_body = INITIAL_HTML
 
 
 def add_examples():
@@ -246,7 +247,18 @@ async def load_example(name):
 
 @bind(document['examples'], 'change')
 def on_example_select(evt):
-    aio.run(load_example(evt.target.value))
+    if anything_modified():
+        d = Dialog("Warning...", ok_cancel=('Proceed', 'Cancel'))
+        style = dict(textAlign="center", paddingBottom="1em")
+        d.panel <= html.DIV("Code changes will be lost. Proceed anyway? Or "
+                            "cancel (so you can then save first)?")
+
+        @bind(d.ok_button, "click")
+        def ok(_):
+            aio.run(load_example(evt.target.value))
+            d.close()
+    else:
+        aio.run(load_example(evt.target.value))
 
 
 @bind(document['btnhelp'], 'click')
@@ -352,6 +364,7 @@ async def open_file():
 
 def load_html(contents):
     """Update the UI given the actual html contents as a string."""
+    global orig_body, orig_code
     try:
         body, script = split_html(contents)
     except Exception as e:
@@ -362,8 +375,16 @@ def load_html(contents):
         return False
     html_editor.setValue(body)
     python_editor.setValue(script)
+    # Save copies so we can detect when edited
+    orig_body = body
+    orig_code = script
     console.log(f'Set body {len(body)} chars, python {len(script)} chars.')
     return True
+
+
+def anything_modified():
+    return not(orig_body == html_editor.getValue() and
+               orig_code == python_editor.getValue())
 
 
 def split_html(contents):
