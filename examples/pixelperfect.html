@@ -1,0 +1,150 @@
+
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython.min.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython_stdlib.js"></script>
+
+<script type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+  setTimeout(function (){
+     brython({debug:1, ids:["pythoncode"]});
+     }, 10);
+}
+</script>
+</head>
+
+<body onload="__brython_pre_then_code()">
+<meta name="viewport" 
+      content="width=device-width, initial-scale=1.0" />
+
+<style>
+html, body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    margin: 0;
+    background-color: #887ecb;
+
+    .canvas-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        height: 100%;
+    }
+
+    canvas {
+        background-color: #50459b;
+        max-width: 100%;
+        max-height: 100%;
+        image-rendering: pixelated;
+    }
+}
+</style>
+
+<div class="canvas-container">
+    <canvas id="gameCanvas" width="64" height="36"></canvas>
+</div>
+
+<script type="text/python" id="brythonpre">
+from browser import document
+
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\n" + msg)
+sys.stderr = __ErrorReporter()
+</script>
+
+<script type="text/python" id="pythoncode">
+# Adapted from 
+# https://medium.com/@oscar.lindberg/
+#   how-to-create-pixel-perfect-graphics-using-html5-canvas-3750eb5f1dc9
+
+import math
+import random
+from browser import document, window
+
+INTEGER_SCALING = True
+
+canvas = document.getElementById("gameCanvas")
+ctx = canvas.getContext("2d")
+
+
+class Star:
+    def __init__(self):
+        self.color = math.floor(random.random() * 256)
+        self.x = random.random() * canvas.width
+        self.y = random.random() * canvas.height
+        self.fillStyle = f'rgb({self.color}, {self.color}, {self.color})'
+    
+    def __lt__(self, other):
+        return self.color < other.color
+
+
+stars = sorted([Star() for _ in range(200)])
+                                                                 
+
+def resizeCanvas(_):
+    scale = min(
+        window.innerWidth / canvas.width,
+        window.innerHeight / canvas.height)
+    if (INTEGER_SCALING):
+        scale = math.floor(scale)
+
+    canvas.style.width = f'{round(scale * canvas.width)}px'
+    canvas.style.height = f'{round(scale * canvas.height)}px'
+
+
+def drawRectangle(x, y, width, height, color):
+    ctx.fillStyle = color
+    ctx.fillRect(
+        round(x),
+        round(y),
+        round(width),
+        round(height))
+
+
+def gameLoop(now):
+    draw(now)
+    window.requestAnimationFrame(gameLoop)
+
+    
+def draw(t):
+    drawRectangle(0, 0, canvas.width, canvas.height, "#000")
+
+    for star in stars:
+        drawRectangle(star.x, star.y, 1, 1, star.fillStyle)
+        star.x = (star.x - star.color / 5000 + canvas.width) % canvas.width
+
+    drawRectangle(
+        canvas.width / 4,
+        canvas.height / 4 + (canvas.width / 10) * math.sin(t / 500),
+        canvas.width / 2,
+        canvas.height / 2,
+        "#008")
+   
+    drawRectangle(
+        canvas.width / 2 + (canvas.width / 4) * math.cos(t / 1000) - 4,
+        canvas.height / 2 + (canvas.height / 4) * math.sin(t / 1000) - 4,
+        8,
+        8,
+        "#00c")
+
+
+resizeCanvas(0)
+window.addEventListener("resize", resizeCanvas)
+gameLoop(0)
+</script>
+</body>
+</html>
