@@ -172,6 +172,13 @@ EXAMPLES = {
 }
 
 
+def _on_tab(cm):
+    if cm.somethingSelected():
+        cm.indentSelection("add")
+    else:
+        cm.replaceSelection(" " * cm.getOption("indentUnit"))
+
+
 html_editor = window.CodeMirror(document['html_editor'], {
     'lineNumbers': True,
     'value': INITIAL_HTML,
@@ -179,7 +186,8 @@ html_editor = window.CodeMirror(document['html_editor'], {
     'indentUnit': 4,
     'mode': 'xml',
     'htmlMode': True,
-    'extraKeys': {'Ctrl-/': 'toggleComment'}})
+    'extraKeys': {
+        'Ctrl-/': 'toggleComment'}})
 html_editor.setSize('100%', '100%')
 
 
@@ -189,7 +197,11 @@ python_editor = window.CodeMirror(document['python_editor'], {
     'tabSize': 4,
     'indentUnit': 4,
     'mode': 'python',
-    'extraKeys': {'Ctrl-/': 'toggleComment'}})
+    'smartIndent': True,
+    'indentWithTabs': False,
+    'extraKeys': {
+        'Ctrl-/': 'toggleComment',
+        'Tab': _on_tab}})
 python_editor.setSize('100%', '100%')
 
 
