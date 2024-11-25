@@ -34,4 +34,3 @@ Build python programs that can run in the browser, from your browser.
 - Find / replace
 - Toggle Header, Body, Code regions
 - Add autosave
-- Fix tabs / spaces
