@@ -163,3 +163,6 @@ cython_debug/
 
 # Emacs temp files
 *~
+
+# Mac temp files
+.DS_Store
