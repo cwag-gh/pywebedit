@@ -34,3 +34,5 @@ Build python programs that can run in the browser, from your browser.
 - Find / replace
 - Toggle Header, Body, Code regions
 - Add autosave
+- If example fails to load, then program shouldn't end in a half
+  loaded state
