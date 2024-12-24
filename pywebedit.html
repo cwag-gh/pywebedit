@@ -118,9 +118,6 @@ PAGE_TEMPLATE = """
 %script% type="text/javascript">
 function __brython_pre_then_code() {
   brython({debug:1, ids:["brythonpre"]});
-  setTimeout(function (){
-     brython({debug:1, ids:["pythoncode"]});
-     }, 10);
 }
 %endscript%
 </head>
@@ -129,7 +126,7 @@ function __brython_pre_then_code() {
 %html_body%
 
 %script% type="text/python" id="brythonpre">
-from browser import document
+from browser import document, window
 
 import sys
 class __ErrorReporter:
@@ -142,6 +139,8 @@ class __ErrorReporter:
             document.body.insertBefore(self.errdiv, document.body.firstChild)
         self.errdiv.textContent += ("\\n" + msg)
 sys.stderr = __ErrorReporter()
+
+window.brython({'debug': 1, 'ids': ["pythoncode"]})
 %endscript%
 
 %script% type="text/python" id="pythoncode">
