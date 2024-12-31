@@ -36,3 +36,5 @@ Build python programs that can run in the browser, from your browser.
 - Add autosave
 - If example fails to load, then program shouldn't end in a half
   loaded state
+- Codemirror:
+  - Add [indentation markers](https://github.com/replit/codemirror-indentation-markers)
