@@ -177,7 +177,9 @@ html_editor = window.EditorView(
 python_editor = window.EditorView(
     {'parent': document['python_editor'],
      'extensions': [window.basicSetup,
-                    window.python()]})
+                    window.python(),
+                    window.indentUnit.of("    ")]})
+
 app_window = None
 file_handle = None
 file_name = None
