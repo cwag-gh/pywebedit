@@ -1,4 +1,4 @@
-//import terser from '@rollup/plugin-terser';
+import terser from '@rollup/plugin-terser'
 import {nodeResolve} from '@rollup/plugin-node-resolve'
 
 export default {
@@ -9,21 +9,19 @@ export default {
 //        sourcemap: true,
     },
     plugins: [
-        nodeResolve()
-//        resolve(), // Resolves node_modules
-//        terser({
-//            format: {
-//                comments: false
-//            },
-//            compress: {
-//                dead_code: true,
-//                drop_console: true,
-//                drop_debugger: true,
-//                pure_funcs: ['console.log']
-//            }
-//        })
-//    ],
-        ]
+        nodeResolve(),
+        terser({
+            format: {
+                comments: false
+            },
+            compress: {
+                dead_code: true,
+                drop_console: true,
+                drop_debugger: true,
+                pure_funcs: ['console.log']
+            }
+        })
+    ]
 //    treeshake: {
 //        moduleSideEffects: false,
 //        propertyReadSideEffects: false
