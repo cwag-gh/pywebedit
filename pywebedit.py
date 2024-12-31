@@ -1,66 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
 
-<head>
-  <meta charset="utf-8">
-  <title>&lt;pywebedit&gt; Code python in the browser, even offline</title>
-
-  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython.min.js"> </script>
-  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython_stdlib.js"> </script>
-
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.css"></link>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/hint/show-hint.min.css"></link>
-  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.js"></script>
-  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/mode/python/python.min.js"></script>
-  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/mode/xml/xml.min.js"></script>
-  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/addon/comment/comment.min.js"></script>
-
-  <!-- Simple styling to get the tight layout we want. -->
-  <style>
-      body     { background-color: #f7f7f7;
-                 margin: 4px; }
-      .row     { display: flex;
-                 gap: 6px; }
-      .column  { flex: 50%; }
-      .toolbar { height: 20px;
-                 align-items: flex-end;
-                 padding-bottom: 2px; }
-      .help    { justify-content: flex-end; }
-      .content { height: calc(100vh - 20px - 4px - 4px - 2px);
-                 overflow-y: scroll; }
-      .mainbtn { font-weight: bold; }
-      .title   { font-family: monospace;
-                 display: inline-block;
-                 padding: 3px 6px;
-                 line-height: normal; }
-  </style>
-</head>
-
-<body onload="brython(1)">
-  <div class="row">
-    <div class="column">
-      <div class="row toolbar">
-        <button id="btnrun" class="mainbtn"> Run </button>
-        <button id="btnopen"> Open </button>
-        <button id="btnsave"> Save </button>
-        <button id="btnsaveas"> Save As </button>
-        <div id="filename" class="title">&lt;pywebedit&gt;</div>
-      </div>
-      <div class="content" id="html_editor">
-      </div>
-    </div>
-
-    <div class="column">
-      <div class="row toolbar help">
-        <select name="examples" id="examples"> </select>
-        <button id="btnhelp"> Help </button>
-      </div>
-      <div class="content" id="python_editor">
-      </div>
-    </div>
-  </div>
-
-<script type="text/python">
 # Main python code
 
 from browser import document, window, bind, aio, console, html
@@ -479,6 +417,3 @@ async def save_file(with_picker):
 window.addEventListener('beforeunload', lambda e: app_window.close() if app_window else None)
 
 add_examples()
-</script>
-</body>
-</html>

@@ -166,3 +166,8 @@ cython_debug/
 
 # Mac temp files
 .DS_Store
+
+# Node modules
+node_modules
+
+webserver.txt
