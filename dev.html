@@ -185,10 +185,14 @@ orig_code = INITIAL_PYTHON
 orig_body = INITIAL_HTML
 
 
-def set_code_in_editor(editor, code):
+def editor_contents_set(editor, code):
     editor.dispatch({'changes': {'from': 0,
                                  'to': editor.state.doc.length,
                                  'insert': code}})
+
+
+def editor_contents_get(editor, code):
+    return editor.state.doc.toString()
 
 
 def add_examples():
@@ -259,7 +263,7 @@ def on_help(_):
 
 def replace_all_tabs():
     """Replaces all tabs with spaces in the python editor."""
-    python_editor.setValue(python_editor.getValue().replace('\t', '    '))
+    editor_contents_set(python_editor, editor_contents_get(python_editor).replace('\t', '    '))
 
 
 @bind(document['btnrun'], 'click')
@@ -370,8 +374,8 @@ def load_html(contents):
                        "Looks like this file was not saved by pywebedit. Unable to load.",
                        ok="Ok")
         return False
-    set_code_in_editor(html_editor, body)
-    set_code_in_editor(python_editor, script)
+    editor_contents_set(html_editor, body)
+    editor_contents_set(python_editor, script)
     # Save copies so we can detect when edited
     orig_body = body
     orig_code = script
@@ -380,8 +384,8 @@ def load_html(contents):
 
 
 def anything_modified():
-    return not(orig_body == html_editor.state.doc.toString() and
-               orig_code == python_editor.state.doc.toString())
+    return not(orig_body == editor_contents_get(html_editor) and
+               orig_code == editor_contents_get(python_editor))
 
 
 def split_html(contents):
@@ -396,8 +400,8 @@ def split_html(contents):
 def build_html():
     """Build the full html text, inserting the user editable sections into the template."""
     tagmap = {'brython_version': BRYTHON_VERSION,
-              'html_body':       html_editor.state.doc.toString(),
-              'python_code':     python_editor.state.doc.toString(),
+              'html_body':       editor_contents_get(html_editor),
+              'python_code':     editor_contents_get(python_editor),
               'script':          '<' + 'script',
               'endscript':       '<' + '/script>'}
     p = PAGE_TEMPLATE
@@ -459,8 +463,8 @@ async def save_file(with_picker):
 window.addEventListener('beforeunload', lambda e: app_window.close() if app_window else None)
 
 add_examples()
-set_code_in_editor(html_editor, INITIAL_HTML)
-set_code_in_editor(python_editor, INITIAL_PYTHON)
+editor_contents_set(html_editor, INITIAL_HTML)
+editor_contents_set(python_editor, INITIAL_PYTHON)
 
 </script>
 </body>
