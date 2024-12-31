@@ -170,4 +170,8 @@ cython_debug/
 # Node modules
 node_modules
 
+# Configurable deploy location
 webserver.txt
+
+# Generated files
+editor.bundle.min.js
