@@ -1,13 +1,17 @@
-import {EditorView, basicSetup} from "codemirror"
+import {basicSetup} from "codemirror"
 import {EditorState} from "@codemirror/state"
+import {EditorView, keymap} from "@codemirror/view"
 import {indentUnit} from "@codemirror/language"
+import {indentWithTab} from "@codemirror/commands"
 import {python} from "@codemirror/lang-python"
 import {html} from "@codemirror/lang-html"
 
 // Explicitly assign to window to prevent tree-shaking
-window.EditorView = EditorView;
-window.EditorState = EditorState;
-window.indentUnit = indentUnit;
-window.basicSetup = basicSetup;
-window.python = python;
-window.html = html;
+window.basicSetup    = basicSetup;
+window.EditorState   = EditorState;
+window.EditorView    = EditorView;
+window.keymap        = keymap;
+window.indentUnit    = indentUnit;
+window.indentWithTab = indentWithTab;
+window.python        = python;
+window.html          = html;

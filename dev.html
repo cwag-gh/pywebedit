@@ -86,7 +86,11 @@ HELP = f"""
 <div>
   Keys:
   <ul>
+    <li>Return: Accepts suggested completion</li>
+    <li>Ctrl-f: Find / replace</li>
     <li>Ctrl-/: Toggle comments on line</li>
+    <li>Tab: Indent line (press Esc then Tab to use default Tab functionality)</li>
+    <li>Shift-Tab: Unindent line</li>
   </ul>
 </div>
 
@@ -96,6 +100,7 @@ HELP = f"""
     <li><a href="https://github.com/cwag-gh/pywebedit/">pywebedit source</a></li>
     <li><a href="https://www.brython.info/">Brython</a> (using v{BRYTHON_VERSION})</li>
     <li><a href="https://www.python.org/">Python</a></li>
+    <li><a href="https://codemirror.net/">Codemirror</a> editor component (v6)</li>
   </ul>
 </div>
 """
@@ -173,12 +178,15 @@ EXAMPLES = {
 html_editor = window.EditorView(
     {'parent': document['html_editor'],
      'extensions': [window.basicSetup,
-                    window.html()]})
+                    window.html(),
+                    window.indentUnit.of("    "),
+                    window.keymap.of([window.indentWithTab])]})
 python_editor = window.EditorView(
     {'parent': document['python_editor'],
      'extensions': [window.basicSetup,
                     window.python(),
-                    window.indentUnit.of("    ")]})
+                    window.indentUnit.of("    "),
+                    window.keymap.of([window.indentWithTab])]})
 
 app_window = None
 file_handle = None
