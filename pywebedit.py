@@ -1,4 +1,3 @@
-
 # Main python code
 
 from browser import document, window, bind, aio, console, html
@@ -26,7 +25,11 @@ HELP = f"""
 <div>
   Keys:
   <ul>
+    <li>Return: Accepts suggested completion</li>
+    <li>Ctrl-f: Find / replace</li>
     <li>Ctrl-/: Toggle comments on line</li>
+    <li>Tab: Indent line (press Esc then Tab to use default Tab functionality)</li>
+    <li>Shift-Tab: Unindent line</li>
   </ul>
 </div>
 
@@ -36,6 +39,7 @@ HELP = f"""
     <li><a href="https://github.com/cwag-gh/pywebedit/">pywebedit source</a></li>
     <li><a href="https://www.brython.info/">Brython</a> (using v{BRYTHON_VERSION})</li>
     <li><a href="https://www.python.org/">Python</a></li>
+    <li><a href="https://codemirror.net/">Codemirror</a> editor component (v6)</li>
   </ul>
 </div>
 """
@@ -109,44 +113,35 @@ EXAMPLES = {
 }
 
 
-def _on_tab(cm):
-    if cm.somethingSelected():
-        cm.indentSelection("add")
-    else:
-        cm.replaceSelection(" " * cm.getOption("indentUnit"))
-
-
-html_editor = window.CodeMirror(document['html_editor'], {
-    'lineNumbers': True,
-    'value': INITIAL_HTML,
-    'tabSize': 4,
-    'indentUnit': 4,
-    'mode': 'xml',
-    'htmlMode': True,
-    'extraKeys': {
-        'Ctrl-/': 'toggleComment'}})
-html_editor.setSize('100%', '100%')
-
-
-python_editor = window.CodeMirror(document['python_editor'], {
-    'lineNumbers': True,
-    'value': INITIAL_PYTHON,
-    'tabSize': 4,
-    'indentUnit': 4,
-    'mode': 'python',
-    'smartIndent': True,
-    'indentWithTabs': False,
-    'extraKeys': {
-        'Ctrl-/': 'toggleComment',
-        'Tab': _on_tab}})
-python_editor.setSize('100%', '100%')
-
+# Main state variables
+html_editor = window.EditorView(
+    {'parent': document['html_editor'],
+     'extensions': [window.basicSetup,
+                    window.html(),
+                    window.indentUnit.of("    "),
+                    window.keymap.of([window.indentWithTab])]})
+python_editor = window.EditorView(
+    {'parent': document['python_editor'],
+     'extensions': [window.basicSetup,
+                    window.python(),
+                    window.indentUnit.of("    "),
+                    window.keymap.of([window.indentWithTab])]})
 
 app_window = None
 file_handle = None
 file_name = None
 orig_code = INITIAL_PYTHON
 orig_body = INITIAL_HTML
+
+
+def editor_contents_set(editor, code):
+    editor.dispatch({'changes': {'from': 0,
+                                 'to': editor.state.doc.length,
+                                 'insert': code}})
+
+
+def editor_contents_get(editor):
+    return editor.state.doc.toString()
 
 
 def add_examples():
@@ -157,14 +152,14 @@ def add_examples():
     default_option.attrs["value"] = ""
     select <= default_option
 
-    # Iterate through the car data and create groups
-    for group_name, cars in EXAMPLES.items():
+    # Iterate through the example groups
+    for group_name, examples in EXAMPLES.items():
         # Create optgroup
         group = html.OPTGROUP()
         group.attrs["label"] = group_name
 
         # Add options to the group
-        for value, display_text in cars:
+        for value, display_text in examples:
             option = html.OPTION(display_text)
             option.attrs["value"] = value
             group <= option
@@ -217,7 +212,7 @@ def on_help(_):
 
 def replace_all_tabs():
     """Replaces all tabs with spaces in the python editor."""
-    python_editor.setValue(python_editor.getValue().replace('\t', '    '))
+    editor_contents_set(python_editor, editor_contents_get(python_editor).replace('\t', '    '))
 
 
 @bind(document['btnrun'], 'click')
@@ -328,8 +323,8 @@ def load_html(contents):
                        "Looks like this file was not saved by pywebedit. Unable to load.",
                        ok="Ok")
         return False
-    html_editor.setValue(body)
-    python_editor.setValue(script)
+    editor_contents_set(html_editor, body)
+    editor_contents_set(python_editor, script)
     # Save copies so we can detect when edited
     orig_body = body
     orig_code = script
@@ -338,8 +333,8 @@ def load_html(contents):
 
 
 def anything_modified():
-    return not(orig_body == html_editor.getValue() and
-               orig_code == python_editor.getValue())
+    return not(orig_body == editor_contents_get(html_editor) and
+               orig_code == editor_contents_get(python_editor))
 
 
 def split_html(contents):
@@ -354,8 +349,8 @@ def split_html(contents):
 def build_html():
     """Build the full html text, inserting the user editable sections into the template."""
     tagmap = {'brython_version': BRYTHON_VERSION,
-              'html_body':       html_editor.getValue(),
-              'python_code':     python_editor.getValue(),
+              'html_body':       editor_contents_get(html_editor),
+              'python_code':     editor_contents_get(python_editor),
               'script':          '<' + 'script',
               'endscript':       '<' + '/script>'}
     p = PAGE_TEMPLATE
@@ -417,3 +412,5 @@ async def save_file(with_picker):
 window.addEventListener('beforeunload', lambda e: app_window.close() if app_window else None)
 
 add_examples()
+editor_contents_set(html_editor, INITIAL_HTML)
+editor_contents_set(python_editor, INITIAL_PYTHON)
