@@ -5,8 +5,7 @@ export default {
     input: 'editor.mjs',
     output: {
         file: '../editor.bundle.min.js',
-        format: 'iife',
-//        sourcemap: true,
+        format: 'iife'
     },
     plugins: [
         nodeResolve(),
@@ -22,8 +21,4 @@ export default {
             }
         })
     ]
-//    treeshake: {
-//        moduleSideEffects: false,
-//        propertyReadSideEffects: false
-//    }
 }
