@@ -38,3 +38,7 @@ Build python programs that can run in the browser, from your browser.
   loaded state
 - Codemirror:
   - Add [indentation markers](https://github.com/replit/codemirror-indentation-markers)
+  - Add text wrapping, because as of now
+- Keep offline capabilities:
+  - Bundle editor component
+  - Allow cdn access
