@@ -2,6 +2,8 @@
 
 Build python programs that can run in the browser, from your browser.
 
+See the live version [here](https://robotfantastic.org/pywebedit/).
+
 
 ## Goals
 
