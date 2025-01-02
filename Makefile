@@ -1,4 +1,4 @@
-all: pywebedit.html editor.bundle.min.js
+all: pywebedit.html pywebeditor.min.js
 
 .PHONY: server dist clean
 
@@ -16,11 +16,6 @@ dev.html: pywebedit.py
 server:
 	python -m http.server
 
-editor.bundle.min.js: pywebeditor/package.json pywebeditor/editor.mjs pywebeditor/rollup.config.js
+pywebeditor.min.js: pywebeditor/package.json pywebeditor/editor.mjs pywebeditor/rollup.config.js
 	cd pywebeditor && npm run build
 	ls -al $@
-
-# Download monolithic working single file
-# TODO: bundle examples
-dist:
-    monolith $(WEBSERVER)/pywebedit/ -o dist/pywebedit.html

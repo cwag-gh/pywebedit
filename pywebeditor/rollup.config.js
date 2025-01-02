@@ -4,7 +4,7 @@ import {nodeResolve} from '@rollup/plugin-node-resolve'
 export default {
     input: 'editor.mjs',
     output: {
-        file: '../editor.bundle.min.js',
+        file: '../pywebeditor.min.js',
         format: 'iife'
     },
     plugins: [
