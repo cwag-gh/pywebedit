@@ -68,6 +68,7 @@ from browser.widgets.dialog import InfoDialog, Dialog
 
 
 BRYTHON_VERSION = '3.13.0'
+PYWEBEDIT_VERSION = '0.1.0'
 
 
 INITIAL_HTML = """
@@ -84,7 +85,14 @@ document['text'].textContent='Hello, World!'
 
 
 HELP = f"""
-<h2 class="title">pywebedit</h2>
+<div>
+  <h3>&ltpywebedit&gt</h3>
+  <p>In-browser python editing and running, allowing creation of
+     standalone webpages that use python. </p>
+  <p>Download the standalone version
+     <a href="https://robotfantastic.org/pywebedit/pywebedit.zip">here</a>.
+     Just unzip, then open pywebedit.html in your browser.</p>
+</div>
 <div>
   Keys:
   <ul>
@@ -99,6 +107,7 @@ HELP = f"""
 <div>
   Links:
   <ul>
+    <li><a href="https://robotfantastic.org/pywebedit/pywebedit.zip">pywebedit offline distribution</a> (v{PYWEBEDIT_VERSION})</li>
     <li><a href="https://github.com/cwag-gh/pywebedit/">pywebedit source</a></li>
     <li><a href="https://www.brython.info/">Brython</a> (using v{BRYTHON_VERSION})</li>
     <li><a href="https://www.python.org/">Python</a></li>
