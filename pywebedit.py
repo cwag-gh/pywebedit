@@ -133,11 +133,6 @@ PYFILES = [('main.py', 'main.py'),
            ('Remove this python module...', '__remove')]
 
 
-def aiorun(asyncfn):
-    """Simple wrapper to create a callable version of an async function."""
-    aio.run(asyncfun())
-
-
 def add_option(select, title, value):
     if title is None:
         select <= html.HR()
