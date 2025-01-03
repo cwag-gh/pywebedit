@@ -53,10 +53,10 @@ HELP = f"""
 </div>
 """
 
-# Template for generated final page. Do not include script
-# tags, which screws up the html in python in html. Use
-# alternate replacement syntax (other than format()) to
-# avoid syntax conflicts.
+# Template for generated final page. Do not include script tags, which
+# screws up the html in python in html. Use alternate replacement
+# syntax (other than format()) to avoid syntax conflicts. Note the
+# second level of indirection when defining the fallback script tags.
 PAGE_TEMPLATE = """
 <!doctype html>
 <html>
@@ -125,305 +125,289 @@ EXAMPLES = {
     ],
 }
 
-
-# Main state variables
-html_editor = window.EditorView(
-    {'parent': document['html_editor'],
-     'extensions': [window.basicSetup,
-                    window.html(),
-                    window.indentUnit.of("    "),
-                    window.keymap.of([window.indentWithTab])]})
-python_editor = window.EditorView(
-    {'parent': document['python_editor'],
-     'extensions': [window.basicSetup,
-                    window.python(),
-                    window.indentUnit.of("    "),
-                    window.keymap.of([window.indentWithTab])]})
-
-app_window = None
-file_handle = None
-file_name = None
-orig_code = INITIAL_PYTHON
-orig_body = INITIAL_HTML
+PYFILES = [('main.py', 'main.py'),
+           (None, None),
+           ('New python module...', '__new'),
+           ('Add existing module...', '__import'),
+           ('Export this python module...', '__export'),
+           ('Remove this python module...', '__remove')]
 
 
-def editor_contents_set(editor, code):
-    editor.dispatch({'changes': {'from': 0,
-                                 'to': editor.state.doc.length,
-                                 'insert': code}})
+def aiorun(asyncfn):
+    """Simple wrapper to create a callable version of an async function."""
+    aio.run(asyncfun())
 
 
-def editor_contents_get(editor):
-    return editor.state.doc.toString()
-
-
-def add_examples():
-    select = document["examples"]
-
-    # Create and add a default option
-    default_option = html.OPTION("Load example...")
-    default_option.attrs["value"] = ""
-    select <= default_option
-
-    # Iterate through the example groups
-    for group_name, examples in EXAMPLES.items():
-        # Create optgroup
-        group = html.OPTGROUP()
-        group.attrs["label"] = group_name
-
-        # Add options to the group
-        for value, display_text in examples:
-            option = html.OPTION(display_text)
-            option.attrs["value"] = value
-            group <= option
-
-        # Add the group to the select
-        select <= group
-
-
-async def load_example(name):
-    try:
-        relative_url = f'./examples/{name}.html'
-        request = await aio.get(relative_url, format='text')
-        if request.status == 200 or request.status == 0:
-            # TODO: check overwrite of modified data
-            if load_html(request.data):
-                set_loaded_file_and_title(None, f'{name}.html')
-                return
-        else:
-            raise RuntimeError(f"HTTP error: status {request.status}")
-    except Exception as e:
-        console.log(str(e))
-        # TODO: Fallback to choosing folder to load local example
-        d = InfoDialog("Unfortunately...",
-                       f"Unable to load {relative_url} from the server.",
-                       ok="Ok")
-    # For all unsuccessful cases, set the combo box back to default
-    document["examples"].value = ''
-
-
-@bind(document['examples'], 'change')
-def on_example_select(evt):
-    if anything_modified():
-        d = Dialog("Warning...", ok_cancel=('Proceed', 'Cancel'))
-        style = dict(textAlign="center", paddingBottom="1em")
-        d.panel <= html.DIV("Code changes will be lost. Proceed anyway? Or "
-                            "cancel (so you can then save first)?")
-
-        @bind(d.ok_button, "click")
-        def ok(_):
-            aio.run(load_example(evt.target.value))
-            d.close()
+def add_option(select, title, value):
+    if title is None:
+        select <= html.HR()
     else:
-        aio.run(load_example(evt.target.value))
+        option = html.OPTION(title)
+        option.attrs["value"] = value
+        select <= option
 
 
-@bind(document['btnhelp'], 'click')
-def on_help(_):
-    d = InfoDialog("Help", HELP, ok="Ok")
+class UI:
+    PICKER_ID = 'choosefile'
 
+    def __init__(self, app):
+        self.app = app
+        self.app_window = None
+        self.html_editor = window.EditorView(
+            {'parent': document['html_editor'],
+             'extensions': [window.basicSetup,
+                            window.html(),
+                            window.indentUnit.of("    "),
+                            window.keymap.of([window.indentWithTab])]})
+        self.python_editor = window.EditorView(
+            {'parent': document['python_editor'],
+             'extensions': [window.basicSetup,
+                            window.python(),
+                            window.indentUnit.of("    "),
+                            window.keymap.of([window.indentWithTab])]})
 
-def replace_all_tabs():
-    """Replaces all tabs with spaces in the python editor."""
-    editor_contents_set(python_editor, editor_contents_get(python_editor).replace('\t', '    '))
+        self.set_contents_html(INITIAL_HTML)
+        self.set_contents_python(INITIAL_PYTHON)
 
+        self._init_examples()
+        self._init_pyfiles()
 
-@bind(document['btnrun'], 'click')
-def on_run(_):
-    global app_window
-    try:
-        if app_window:
-            app_window.close()
-    except:
-        # Weird error in Chrome when someone reloads the generated tab,
-        # and we then can't access it
-        pass
-    replace_all_tabs()
-    app_window = window.open()
-    app_window.document.write(build_html())
-    app_window.document.close()
+        # Set up the events
+        document['examples'].bind('change', self.on_example_select)
+        document['btnhelp'].bind('click', self.on_help)
+        document['btnrun'].bind('click', self.on_run)
+        document['btnopen'].bind('click', self.on_open_precheck)
+        document['btnsave'].bind('click', lambda e: aio.run(self.on_save()))
+        document['btnsaveas'].bind('click', lambda e: aio.run(self.on_save_as()))
+        window.addEventListener('beforeunload', self._close_app_window)
 
-    # Download to a file - user has to click on it, but works
-    # blob = window.Blob.new([build_html()], {'type': 'text/html' })
-    # a = document.createElement('a')
-    # a.href = window.URL.createObjectURL(blob)
-    # a.download = 'generated.html'
-    # a.click()
+    def _close_app_window(self, evt):
+        return self.app_window.close() if self.app_window else None
 
+    def _init_examples(self):
+        select = document["examples"]
+        add_option(select, "Load example...", "")
+        for group_name, examples in EXAMPLES.items():
+            group = html.OPTGROUP()
+            group.attrs["label"] = group_name
+            for value, display_text in examples:
+                add_option(group, display_text, value)
+            select <= group
 
-@bind(document['btnopen'], 'click')
-def on_open(_):
-    # Need this intermediate to run async functions
-    aio.run(open_file())
+    def _init_pyfiles(self):
+        select = document["pyfiles"]
+        for title, value in PYFILES:
+            add_option(select, title, value)
 
+    def on_run(self, evt):
+        try:
+            if self.app_window:
+                self.app_window.close()
+        except:
+            # Weird error in Chrome when someone reloads the generated tab,
+            # and we then can't access it
+            pass
+        self.replace_all_tabs()
+        self.app_window = window.open()
+        self.app_window.document.write(self.app.build_html(self.contents_html(),
+                                                           self.contents_python()))
+        self.app_window.document.close()
 
-async def pick_file_for_saving():
-    return await _pick_file(True)
+        # Download to a file - user has to click on it, but works
+        # blob = window.Blob.new([build_html()], {'type': 'text/html' })
+        # a = document.createElement('a')
+        # a.href = window.URL.createObjectURL(blob)
+        # a.download = 'generated.html'
+        # a.click()
 
+    def on_open_precheck(self, evt):
+        self.warn_if_modified(onok=self.on_open())
 
-async def pick_existing_file():
-    return await _pick_file(False)
-
-
-async def _pick_file(for_saving):
-    global file_handle, file_name
-    try:
-        if for_saving:
-            name = 'myprogram.html'
-            if file_name is not None:
-                name = file_name
-            handle = await window.showSaveFilePicker({
-               'id': 'choosefile', # Use same id between pickers to save folder
-               'suggestedName': name,
-               'types': [{'description': 'Text documents',
-                          'accept': {'text/html': ['.html']}}]})
-            # TODO: check for success
-            file_handle = handle
-            file_name = file_handle.name
-            return True
-        else:
+    async def on_open(self):
+        """Pick a file, then load it."""
+        try:
             file_handles = await window.showOpenFilePicker({
-               'id': 'choosefile'}) # Use same id between pickers to save folder
-            if len(file_handles) > 0:
-                file_handle = file_handles[0]
-                file_name = file_handle.name
-                return True
-    except AttributeError:
-        # TODO: should be able to handle local saving using download to a file approach
-        d = InfoDialog("Unfortunately...",
-                       "This browser does not support opening and saving local files. Try Chrome.",
-                       ok="Ok")
-    return False
-
-
-def set_loaded_file_and_title(handle=None, title=None):
-    """Single function to set what has been loaded - a file or an example"""
-    global file_handle, file_name
-    file_handle = handle
-    file_name = title
-    if file_name is None:
-        if file_handle is None:
-            # Reset
-            file_name = ''
-        else:
-            file_name = file_handle.name
-    # Set the UI of the title
-    document.getElementById('filename').innerHTML = f'&lt;pywebedit&gt; {file_name}'
-    document.title = f'<pywebedit> {file_name}'
-
-
-async def open_file():
-    """Pick a file, then load it."""
-    global file_handle
-    success = await pick_existing_file()
-    if not success:
-        return
-    f = await file_handle.getFile()
-    contents = await f.text()
-    load_html(contents)
-    console.log(f'Opened {file_handle.name}.')
-    set_loaded_file_and_title(file_handle, file_handle.name)
-
-
-def load_html(contents):
-    """Update the UI given the actual html contents as a string."""
-    global orig_body, orig_code
-    try:
-        body, script = split_html(contents)
-    except Exception as e:
-        console.log(e)
-        d = InfoDialog("Error",
-                       "Looks like this file was not saved by pywebedit. Unable to load.",
-                       ok="Ok")
-        return False
-    editor_contents_set(html_editor, body)
-    editor_contents_set(python_editor, script)
-    # Save copies so we can detect when edited
-    orig_body = body
-    orig_code = script
-    console.log(f'Set body {len(body)} chars, python {len(script)} chars.')
-    return True
-
-
-def anything_modified():
-    return not(orig_body == editor_contents_get(html_editor) and
-               orig_code == editor_contents_get(python_editor))
-
-
-def split_html(contents):
-    """Split out header, python script out of saved html."""
-    body_and_script = contents.split('<body onload="__brython_pre_then_code()">')[1]
-    body = body_and_script.split('<' + 'script type="text/python" id="brythonpre">')[0].strip()
-    script_and_foot = body_and_script.split('<' + 'script type="text/python" id="pythoncode">')[1]
-    script = script_and_foot.split('<' + '/script>')[0].strip()
-    return body, script
-
-
-def build_html():
-    """Build the full html text, inserting the user editable sections into the template."""
-    tagmap = {'brython_version': BRYTHON_VERSION,
-              'html_body':       editor_contents_get(html_editor),
-              'python_code':     editor_contents_get(python_editor),
-              'script':          '<' + 'script',
-              'endscript':       '<' + '/script>'}
-    p = PAGE_TEMPLATE
-    for key, value in tagmap.items():
-        p = p.replace('%' + key + '%', value)
-    return p
-
-
-# def save_data_to_file(data, filename, type):
-#     blob = window.Blob
-#     file = blob.new([data], {'type': type})
-#     if window.navigator.msSaveOrOpenBlob: # IE10+
-#         window.navigator.msSaveOrOpenBlob(file, filename)
-#     else: # Others
-#         a = document.createElement('a')
-#         url = window.URL.createObjectURL(file)
-#         a.href = url
-#         a.download = filename
-#         document.body.appendChild(a)
-#         a.click()
-#         def remove_url():
-#             document.body.removeChild(a)
-#             window.URL.revokeObjectURL(url)
-#         window.setTimeout(remove_url, 0)
-
-
-async def write_file(contents):
-    global file_handle
-    assert file_handle is not None
-    writable = await file_handle.createWritable()
-    await writable.write(contents)
-    await writable.close()
-
-
-@bind(document['btnsave'], 'click')
-def on_save(_):
-    replace_all_tabs()
-    aio.run(save_file(False))
-
-
-@bind(document['btnsaveas'], 'click')
-def on_save_as(_):
-    replace_all_tabs()
-    aio.run(save_file(True))
-
-
-async def save_file(with_picker):
-    global file_handle, file_name
-    if file_handle is None or with_picker:
-        success = await pick_file_for_saving()
-        if not success:
+                'id': self.PICKER_ID}) # Use same id between pickers to save folder
+            if len(file_handles) == 0:
+                return
+        except AttributeError:
+            self.erropen()
             return
-    # A bit lame - this re-sets what is already there just to update the UI
-    set_loaded_file_and_title(file_handle, file_name)
-    await write_file(build_html())
+        await self.app.open_file(file_handles[0])
+
+    async def on_save(self, force_picker=False):
+        self.replace_all_tabs()
+        handle = self.app.file_handle
+        if force_picker or not self.app.has_file():
+            name = 'myprogram.html'
+            if self.app.file_name is not None:
+                name = self.app.file_name
+            try:
+                handle = await window.showSaveFilePicker({
+                   'id': self.PICKER_ID, # Use same id between pickers to save folder
+                   'suggestedName': name,
+                   'types': [{'description': 'Text documents',
+                              'accept': {'text/html': ['.html']}}]})
+            except AttributeError:
+                self.erropen()
+                return
+            except DOMException:
+                # User cancelled
+                return
+        await self.app.save_file(handle, self.contents_html(), self.contents_python())
+
+    async def on_save_as(self):
+        await self.on_save(force_picker=True)
+
+    def on_example_select(self, evt):
+        self.warn_if_modified(onok=self.app.load_example(evt.target.value))
+
+    def on_help(self, evt):
+        self.msg("Help", HELP)
+
+    def warn_if_modified(self, onok):
+        if self.anything_modified():
+            d = Dialog("Warning...", ok_cancel=('Proceed', 'Cancel'))
+            d.panel <= html.DIV("Code changes will be lost. Proceed anyway? "
+                                "Or, cancel (so you can then save first)?")
+
+            @bind(d.ok_button, "click")
+            def ok(_):
+                aio.run(onok)
+                d.close()
+        else:
+            aio.run(onok)
+
+    def msg(self, title, text):
+        d = InfoDialog(title, text, ok="Ok")
+
+    def err(self, text):
+        self.msg('Unfortunately...', text)
+
+    def erropen(self):
+        self.err("This browser does not support opening and saving local files. Try Chrome.")
+
+    def anything_modified(self):
+        return not(self.app.orig_body == self.contents_html() and
+                   self.app.orig_code == self.contents_python())
+
+    def contents_html(self):
+        return self.html_editor.state.doc.toString()
+
+    def contents_python(self):
+        return self.python_editor.state.doc.toString()
+
+    def replace_all_tabs(self):
+        """Replaces all tabs with spaces in the python editor."""
+        self.set_contents_python(self.contents_python().replace('\t', '    '))
+
+    def set_loaded_file(self, file_name):
+        document.getElementById('filename').innerHTML = f'&lt;pywebedit&gt; {file_name}'
+        document.title = f'<pywebedit> {file_name}'
+
+    def set_contents_html(self, code):
+        self.html_editor.dispatch({'changes': {'from': 0,
+                                               'to': self.html_editor.state.doc.length,
+                                               'insert': code}})
+
+    def set_contents_python(self, code):
+        self.python_editor.dispatch({'changes': {'from': 0,
+                                                 'to': self.python_editor.state.doc.length,
+                                                 'insert': code}})
+
+    def set_example_choice(self, value):
+        document["examples"].value = value
 
 
-# Auto close child window if main window is closed
-window.addEventListener('beforeunload', lambda e: app_window.close() if app_window else None)
+class App:
+    def __init__(self):
+        self.file_handle = None
+        self.file_name = None # Save file name separate
+        self.orig_code = INITIAL_PYTHON
+        self.orig_body = INITIAL_HTML
 
-add_examples()
-editor_contents_set(html_editor, INITIAL_HTML)
-editor_contents_set(python_editor, INITIAL_PYTHON)
+        self.ui = UI(self)
+
+    def has_file(self):
+        return self.file_handle != None
+
+    async def load_example(self, name):
+        # Assumes overwrite check has already been completed
+        relative_url = f'./examples/{name}.html'
+        try:
+            request = await aio.get(relative_url, format='text')
+            if not(request.status == 200 or request.status == 0):
+                raise RuntimeError(f'HTTP error: status {request.status}')
+            if not request.data:
+                raise RuntimeError(f'Empty request data')
+            if self.load_html(request.data):
+                self.file_handle = None
+                self.file_name = f'{name}.html'
+                self.ui.set_loaded_file(f'{name}.html')
+                return
+        except Exception as e:
+            console.log(str(e))
+            self.ui.err(f'Unable to load {relative_url} from the server.')
+        # For all unsuccessful cases, set the combo box back to default
+        self.ui.set_example_choice('')
+
+    async def open_file(self, file_handle):
+        f = await file_handle.getFile()
+        contents = await f.text()
+        if not self.load_html(contents):
+            return
+        # File load successful
+        self.file_handle = file_handle
+        self.file_name = file_handle.name
+        console.log(f'Opened {file_handle.name}.')
+        self.ui.set_loaded_file(file_handle.name)
+
+    def load_html(self, contents):
+        try:
+            body, script = self.split_html(contents)
+        except Exception as e:
+            console.log(e)
+            self.ui.err('Looks like this file was not saved by pywebedit. Unable to load.')
+            return False
+        # Load successful
+        self.ui.set_contents_html(body)
+        self.ui.set_contents_python(script)
+        # Save copies so we can detect when edited
+        self.orig_body = body
+        self.orig_code = script
+        return True
+
+    def split_html(self, contents):
+        """Split out header, python script out of saved html."""
+        body_and_script = contents.split('<body onload="__brython_pre_then_code()">')[1]
+        body = body_and_script.split(
+            '<' + 'script type="text/python" id="brythonpre">')[0].strip()
+        script_and_foot = body_and_script.split(
+            '<' + 'script type="text/python" id="pythoncode">')[1]
+        script = script_and_foot.split('<' + '/script>')[0].strip()
+        return body, script
+
+    def build_html(self, html_body, python_code):
+        """Build the full html text, inserting the user editable sections into the template."""
+        tagmap = {'brython_version': BRYTHON_VERSION,
+                  'html_body':       html_body,
+                  'python_code':     python_code,
+                  'script':          '<' + 'script',
+                  'endscript':       '<' + '/script>'}
+        p = PAGE_TEMPLATE
+        for key, value in tagmap.items():
+            p = p.replace('%' + key + '%', value)
+        return p
+
+    async def save_file(self, file_handle, html_body, python_code):
+        self.file_handle = file_handle
+        self.file_name = file_handle.name
+        full_html = self.build_html(html_body, python_code)
+        writable = await file_handle.createWritable()
+        await writable.write(full_html)
+        await writable.close()
+        console.log(f'Wrote {self.file_name}')
+        self.ui.set_loaded_file(self.file_name)
+
+
+app = App()
