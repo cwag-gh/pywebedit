@@ -15,7 +15,9 @@ See the live version [here](https://robotfantastic.org/pywebedit/).
 - Make sure python errors are reported to the screen, as opposed to
   the developer console (also often blocked)
 - Allow distribution of resulting programs as standalone html files,
-  which can be run directly from the browser, and shared using Google Drive
+  which can be run directly from the browser, and shared using Google
+  Drive
+- Maximize vertical space for coding on a Chromebook
 
 
 ## Approach
@@ -37,10 +39,11 @@ See the live version [here](https://robotfantastic.org/pywebedit/).
 
 ## TODO
 
-- Add text wrapping, because as of now it affects the editor width
-  if lines go too long
+- Fix behavior with long lines - editor grows, which may not be what
+  we want
 - Add ability to have multiple python files
 - Add examples as tutorials
+  - Variations on input
 - Add all examples from Brython website?
 - Add examples using pixi.js (fast 2d rendering engine, basis for
   Phaser.js)
