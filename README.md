@@ -52,3 +52,4 @@ See the live version [here](https://robotfantastic.org/pywebedit/).
 - Fix bug: If example fails to load, incorrectly states that it wasn't
   encoded by pywebedit
 - Add [indentation markers](https://github.com/replit/codemirror-indentation-markers)
+- Don't add the stdlib if the python doesn't require it
