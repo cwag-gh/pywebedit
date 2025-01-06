@@ -94,14 +94,27 @@ class __ErrorReporter:
         self.errdiv.textContent += ("\\n" + msg)
 sys.stderr = __ErrorReporter()
 
+# Load modules - use runPythonSource as it is synchronous
+for module in [%modules%]:
+    __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
+
+# Now run main code
 window.brython({'debug': 1, 'ids': ["pythoncode"]})
 %endscript%
+
+%modulescripts%
 
 %script% type="text/python" id="pythoncode">
 %python_code%
 %endscript%
 </body>
 </html>
+"""
+
+MODULE_TEMPLATE = """
+%script% type="text/python" id="%moduleid%">
+%
+%endscript%
 """
 
 EXAMPLES = {
@@ -125,12 +138,14 @@ EXAMPLES = {
     ],
 }
 
-PYFILES = [('main.py', 'main.py'),
+PYFILES = [('main.py', 'main'),
            (None, None),
-           ('New python module...', '__new'),
-           ('Add existing module...', '__import'),
-           ('Export this python module...', '__export'),
-           ('Remove this python module...', '__remove')]
+           ('New python module', '__new'),
+           ('Import existing module', '__import'),
+           (None, None),
+           ('Export this python module', '__export'),
+           ('Rename this python module', '__rename'),
+           ('Remove this python module', '__remove')] # TODO: only add when there is more than one
 
 
 def add_option(select, title, value):
@@ -138,7 +153,7 @@ def add_option(select, title, value):
         select <= html.HR()
     else:
         option = html.OPTION(title)
-        option.attrs["value"] = value
+        option.attrs['value'] = value
         select <= option
 
 
@@ -152,13 +167,13 @@ class UI:
             {'parent': document['html_editor'],
              'extensions': [window.basicSetup,
                             window.html(),
-                            window.indentUnit.of("    "),
+                            window.indentUnit.of('    '),
                             window.keymap.of([window.indentWithTab])]})
         self.python_editor = window.EditorView(
             {'parent': document['python_editor'],
              'extensions': [window.basicSetup,
                             window.python(),
-                            window.indentUnit.of("    "),
+                            window.indentUnit.of('    '),
                             window.keymap.of([window.indentWithTab])]})
 
         self.set_contents_html(INITIAL_HTML)
@@ -168,29 +183,30 @@ class UI:
         self._init_pyfiles()
 
         # Set up the events
-        document['examples'].bind('change', self.on_example_select)
-        document['btnhelp'].bind('click', self.on_help)
         document['btnrun'].bind('click', self.on_run)
         document['btnopen'].bind('click', self.on_open_precheck)
         document['btnsave'].bind('click', lambda e: aio.run(self.on_save()))
         document['btnsaveas'].bind('click', lambda e: aio.run(self.on_save_as()))
+        document['examples'].bind('change', self.on_example_select)
+        document['pyfiles'].bind('change', self.on_pyfiles_select)
+        document['btnhelp'].bind('click', self.on_help)
         window.addEventListener('beforeunload', self._close_app_window)
 
     def _close_app_window(self, evt):
         return self.app_window.close() if self.app_window else None
 
     def _init_examples(self):
-        select = document["examples"]
-        add_option(select, "Load example...", "")
+        select = document['examples']
+        add_option(select, 'Load example...', '')
         for group_name, examples in EXAMPLES.items():
             group = html.OPTGROUP()
-            group.attrs["label"] = group_name
+            group.attrs['label'] = group_name
             for value, display_text in examples:
                 add_option(group, display_text, value)
             select <= group
 
     def _init_pyfiles(self):
-        select = document["pyfiles"]
+        select = document['pyfiles']
         for title, value in PYFILES:
             add_option(select, title, value)
 
@@ -254,19 +270,22 @@ class UI:
     async def on_save_as(self):
         await self.on_save(force_picker=True)
 
+    def on_pyfiles_select(self, evt):
+        evt.target.value
+
     def on_example_select(self, evt):
         self.warn_if_modified(onok=self.app.load_example(evt.target.value))
 
     def on_help(self, evt):
-        self.msg("Help", HELP)
+        self.msg('Help', HELP)
 
     def warn_if_modified(self, onok):
-        if self.anything_modified():
-            d = Dialog("Warning...", ok_cancel=('Proceed', 'Cancel'))
-            d.panel <= html.DIV("Code changes will be lost. Proceed anyway? "
-                                "Or, cancel (so you can then save first)?")
+        if self.app.anything_modified(self.contents_html(), self.contents_python()):
+            d = Dialog('Warning...', ok_cancel=('Proceed', 'Cancel'))
+            d.panel <= html.DIV('Code changes will be lost. Proceed anyway? '
+                                'Or, cancel (so you can then save first)?')
 
-            @bind(d.ok_button, "click")
+            @bind(d.ok_button, 'click')
             def ok(_):
                 aio.run(onok)
                 d.close()
@@ -274,17 +293,17 @@ class UI:
             aio.run(onok)
 
     def msg(self, title, text):
-        d = InfoDialog(title, text, ok="Ok")
+        d = InfoDialog(title, text, ok='Ok')
 
     def err(self, text):
         self.msg('Unfortunately...', text)
 
     def erropen(self):
-        self.err("This browser does not support opening and saving local files. Try Chrome.")
+        self.err('This browser does not support opening and saving local files. Try Chrome.')
 
-    def anything_modified(self):
-        return not(self.app.orig_body == self.contents_html() and
-                   self.app.orig_code == self.contents_python())
+#    def anything_modified(self):
+#        return not(self.app.orig_body == self.contents_html() and
+#                   self.app.orig_code == self.contents_python())
 
     def contents_html(self):
         return self.html_editor.state.doc.toString()
@@ -311,20 +330,40 @@ class UI:
                                                  'insert': code}})
 
     def set_example_choice(self, value):
-        document["examples"].value = value
+        document['examples'].value = value
+
+    ## def set_module_list(self, names):
+    ##     do this
+    ##     PYFILES[1:]
 
 
 class App:
     def __init__(self):
         self.file_handle = None
         self.file_name = None # Save file name separate
-        self.orig_code = INITIAL_PYTHON
+        self.modules: dict[str, str] = {} # Store the code for all python modules
+        self.active_module = 'main'
+        self.orig_modules = {'main': INITIAL_PYTHON}
         self.orig_body = INITIAL_HTML
 
         self.ui = UI(self)
 
+    def anything_modified(self, current_body, current_python):
+        self.modules[self.active_module] = current_python
+        return ((current_body != self.orig_body) or
+                (set(self.orig_modules.keys()) != set(self.modules.keys())) or
+                any(self.orig_modules[k] != self.modules[k] for k in self.modules))
+
     def has_file(self):
         return self.file_handle != None
+
+    def update_ui(self, update_python_text=False):
+        # Not complete - we don't keep track of active example
+        self.ui.set_loaded_file(self.file_name)
+        self.ui.set_module_list(self.modules.keys())
+        self.ui.set_active_module(self.active_module)
+        if update_python_text:
+            self.ui.set_contents_python(self.modules[self.active_module])
 
     async def load_example(self, name):
         # Assumes overwrite check has already been completed
@@ -364,12 +403,12 @@ class App:
             console.log(e)
             self.ui.err('Looks like this file was not saved by pywebedit. Unable to load.')
             return False
-        # Load successful
-        self.ui.set_contents_html(body)
-        self.ui.set_contents_python(script)
         # Save copies so we can detect when edited
         self.orig_body = body
         self.orig_code = script
+        # Load successful
+        self.ui.set_contents_html(body)
+        self.ui.set_contents_python(script)
         return True
 
     def split_html(self, contents):
@@ -384,11 +423,25 @@ class App:
 
     def build_html(self, html_body, python_code):
         """Build the full html text, inserting the user editable sections into the template."""
+        module_texts = []
+        for module in self.modules:
+            if module == 'main':
+                continue
+            tagmap = {'script':    '<' + 'script',
+                      'endscript': '<' + '/script>',
+                      'moduleid': f'__pwe_{module}'}
+            m = MODULE_TEMPLATE
+            for key, value in tagmap.items():
+                m = m.replace('%' + key + '%', value)
+            module_texts.append(m)
+
         tagmap = {'brython_version': BRYTHON_VERSION,
                   'html_body':       html_body,
                   'python_code':     python_code,
                   'script':          '<' + 'script',
-                  'endscript':       '<' + '/script>'}
+                  'endscript':       '<' + '/script>',
+                  'modules':         ', '.join(m for m in self.modules if m != 'main'),
+                  'modulescripts':   '\n\n'.join(module_texts)}
         p = PAGE_TEMPLATE
         for key, value in tagmap.items():
             p = p.replace('%' + key + '%', value)
@@ -402,7 +455,46 @@ class App:
         await writable.write(full_html)
         await writable.close()
         console.log(f'Wrote {self.file_name}')
-        self.ui.set_loaded_file(self.file_name)
+        self.update_ui()
+
+    def new_module(self, name, current_python_code):
+        assert name not in self.modules
+        self.modules[self.active_module] = current_python_code
+        self.active_module = name
+        self.modules[name] = ''
+        self.update_ui(update_python_text=True)
+
+    async def import_module(self, file_handle, current_python_code):
+        self.modules[self.active_module] = current_python_code
+        f = await file_handle.getFile()
+        contents = await f.text()
+        name = file_handle.name.replace('.py', '')
+        self.modules[name] = contents.replace('\t', '    ')
+        self.active_module = name
+        console.log(f'Imported {file_handle.name}.')
+        self.update_ui(update_python_text=True)
+
+    async def export_module(self, file_handle, current_python_code):
+        self.modules[self.active_module] = current_python_code
+        writable = await file_handle.createWritable()
+        await writable.write(current_python_code)
+        await writable.close()
+        console.log(f'Exported module {self.active_module} as {self.file_name}')
+
+    def rename_module(self, new_name):
+        assert new_name not in self.modules
+        assert self.active_module != 'main'
+        old_name = self.active_module
+        self.modules[new_name] = self.modules[old_name]
+        del self.modules[old_name]
+        self.active_module = new_name
+        self.update_ui(update_python_text=False)
+
+    def remove_module(self):
+        assert len(self.modules) > 1
+        del self.modules[self.active_module]
+        self.active_module = 'main'
+        self.update_ui(update_python_text=True)
 
 
 app = App()
