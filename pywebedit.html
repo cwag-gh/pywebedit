@@ -69,11 +69,10 @@
 <script type="text/python"># Main python code
 
 from browser import document, window, bind, aio, console, html
-from browser.widgets.dialog import InfoDialog, Dialog
-
+from browser.widgets.dialog import InfoDialog, Dialog, EntryDialog
 
 BRYTHON_VERSION = '3.13.0'
-PYWEBEDIT_VERSION = '0.1.0'
+PYWEBEDIT_VERSION = '0.2.0'
 
 
 INITIAL_HTML = """
@@ -206,7 +205,7 @@ EXAMPLES = {
     ],
 }
 
-PYFILES = [('main.py', 'main'),
+PYFILES = [('main', 'main'),
            (None, None),
            ('New python module', '__new'),
            ('Import existing module', '__import'),
@@ -244,9 +243,6 @@ class UI:
                             window.indentUnit.of('    '),
                             window.keymap.of([window.indentWithTab])]})
 
-        self.set_contents_html(INITIAL_HTML)
-        self.set_contents_python(INITIAL_PYTHON)
-
         self._init_examples()
         self._init_pyfiles()
 
@@ -275,7 +271,7 @@ class UI:
 
     def _init_pyfiles(self):
         select = document['pyfiles']
-        for title, value in PYFILES:
+        for title, value in PYFILES[:-1]:
             add_option(select, title, value)
 
     def on_run(self, evt):
@@ -286,7 +282,6 @@ class UI:
             # Weird error in Chrome when someone reloads the generated tab,
             # and we then can't access it
             pass
-        self.replace_all_tabs()
         self.app_window = window.open()
         self.app_window.document.write(self.app.build_html(self.contents_html(),
                                                            self.contents_python()))
@@ -302,20 +297,25 @@ class UI:
     def on_open_precheck(self, evt):
         self.warn_if_modified(onok=self.on_open())
 
-    async def on_open(self):
-        """Pick a file, then load it."""
+    async def _pick_file_to_open(self):
         try:
             file_handles = await window.showOpenFilePicker({
                 'id': self.PICKER_ID}) # Use same id between pickers to save folder
             if len(file_handles) == 0:
-                return
+                return None
         except AttributeError:
             self.erropen()
+            return None
+        return file_handles[0]
+
+    async def on_open(self):
+        """Pick a file, then load it."""
+        file_handle = await self._pick_file_to_open()
+        if file_handle is None:
             return
-        await self.app.open_file(file_handles[0])
+        await self.app.open_file(file_handle)
 
     async def on_save(self, force_picker=False):
-        self.replace_all_tabs()
         handle = self.app.file_handle
         if force_picker or not self.app.has_file():
             name = 'myprogram.html'
@@ -330,7 +330,7 @@ class UI:
             except AttributeError:
                 self.erropen()
                 return
-            except DOMException:
+            except JavascriptError:
                 # User cancelled
                 return
         await self.app.save_file(handle, self.contents_html(), self.contents_python())
@@ -338,8 +338,90 @@ class UI:
     async def on_save_as(self):
         await self.on_save(force_picker=True)
 
+    def _check_valid_module_name(self, name, with_existing_check=True):
+        title = 'Invalid module name'
+        if len(name) > 20:
+            self.err('Module names must be no more than 20 letters.', title)
+        elif name.startswith('__'):
+            self.err('Module names must not start with two underscores.', title)
+        elif with_existing_check and name in self.app.modules:
+            self.err('Module name already exists.', title)
+        else:
+            return True
+        return False
+
+    def _check_newname(self, name):
+        if self._check_valid_module_name(name):
+            self.app.new_module(name, self.contents_python())
+
+    def _check_rename(self, name):
+        if self._check_valid_module_name(name):
+            self.app.rename_module(name)
+
+    async def on_import(self):
+        file_handle = await self._pick_file_to_open()
+        if file_handle is None:
+            return
+        module_name = file_handle.name.replace('.py', '')
+        if module_name in self.app.modules:
+            def complete_import(name):
+                if self._check_valid_module_name(name, with_existing_check=False):
+                    aio.run(self.app.import_module(name, file_handle, self.contents_python()))
+
+            self.inputdialog(
+                'Warning...',
+                f'Module "{module_name}" already exists.<br><br>'
+                'Enter a new name, or just keep the same to overwrite the module.<br><br>'
+                'Import module as:',
+                onok=complete_import, value=module_name)
+        else:
+            await self.app.import_module(module_name, file_handle, self.contents_python())
+
+    async def on_export(self):
+        name = f'{self.app.active_module}.py'
+        try:
+            handle = await window.showSaveFilePicker({
+               'id': self.PICKER_ID, # Use same id between pickers to save folder
+               'suggestedName': name,
+               'types': [{'description': 'Python files',
+                          'accept': {'text/py': ['.py']}}]})
+        except AttributeError:
+            self.erropen()
+            return
+        except JavascriptError:
+            # User cancelled
+            return
+        await self.app.export_module(handle, self.contents_python())
+
+    def on_remove(self):
+        d = Dialog('Warning...', ok_cancel=('Proceed', 'Cancel'))
+        d.panel <= html.DIV(f'Proceed with removing module {self.app.active_module}? '
+                            'Non-exported changes will be lost.')
+
+        @bind(d.ok_button, 'click')
+        def ok(_):
+            d.close()
+            self.app.remove_module()
+
     def on_pyfiles_select(self, evt):
-        evt.target.value
+        module = evt.target.value
+        if module.startswith('__'):
+            self.set_active_module(self.app.active_module)
+        if module == '__new':
+            self.inputdialog('New module', 'Module name', self._check_newname)
+        elif module == '__import':
+            aio.run(self.on_import())
+        elif module == '__export':
+            aio.run(self.on_export())
+        elif module == '__rename':
+            if self.app.active_module == 'main':
+                self.err("Can't rename main module.")
+                return
+            self.inputdialog('Rename module', 'New name', self._check_rename)
+        elif module == '__remove':
+            self.on_remove()
+        else:
+            self.app.select_module(module, self.contents_python())
 
     def on_example_select(self, evt):
         self.warn_if_modified(onok=self.app.load_example(evt.target.value))
@@ -360,6 +442,18 @@ class UI:
         else:
             aio.run(onok)
 
+    def inputdialog(self, title, prompt, onok, value=None):
+        d = EntryDialog(title, prompt)
+        if value is not None:
+            d.entry.value = value
+
+        @bind(d, 'entry')
+        def entry(ev):
+            value = d.value
+            d.close()
+            if value:
+                onok(value)
+
     def msg(self, title, text):
         d = InfoDialog(title, text, ok='Ok')
 
@@ -369,19 +463,11 @@ class UI:
     def erropen(self):
         self.err('This browser does not support opening and saving local files. Try Chrome.')
 
-#    def anything_modified(self):
-#        return not(self.app.orig_body == self.contents_html() and
-#                   self.app.orig_code == self.contents_python())
-
     def contents_html(self):
         return self.html_editor.state.doc.toString()
 
     def contents_python(self):
-        return self.python_editor.state.doc.toString()
-
-    def replace_all_tabs(self):
-        """Replaces all tabs with spaces in the python editor."""
-        self.set_contents_python(self.contents_python().replace('\t', '    '))
+        return self.python_editor.state.doc.toString().replace('\t', '    ')
 
     def set_loaded_file(self, file_name):
         document.getElementById('filename').innerHTML = f'&lt;pywebedit&gt; {file_name}'
@@ -400,17 +486,33 @@ class UI:
     def set_example_choice(self, value):
         document['examples'].value = value
 
+    def set_active_module(self, module_name):
+        document['pyfiles'].value = module_name
+
+    def set_module_list(self, names):
+        select = document['pyfiles']
+        select.innerHTML = ''  # This clears the selection box
+        for name in names:
+            add_option(select, name, name)
+        # Don't add the remove option if there is only one
+        pyfiles = PYFILES[1:] if len(self.app.modules) > 1 else PYFILES[1:-1]
+        for title, value in pyfiles:
+            add_option(select, title, value)
+
 
 class App:
     def __init__(self):
         self.file_handle = None
         self.file_name = None # Save file name separate
-        self.modules: dict[str, str] = {} # Store the code for all python modules
+        self.modules: dict[str, str] = {'main': INITIAL_PYTHON}
         self.active_module = 'main'
-        self.orig_modules = {'main': INITIAL_PYTHON}
+        self.orig_modules = dict(self.modules)
         self.orig_body = INITIAL_HTML
 
         self.ui = UI(self)
+
+        self.ui.set_contents_html(self.orig_body)
+        self.update_ui(update_python_text=True)
 
     def anything_modified(self, current_body, current_python):
         self.modules[self.active_module] = current_python
@@ -423,7 +525,8 @@ class App:
 
     def update_ui(self, update_python_text=False):
         # Not complete - we don't keep track of active example
-        self.ui.set_loaded_file(self.file_name)
+        if self.file_name is not None:
+            self.ui.set_loaded_file(self.file_name)
         self.ui.set_module_list(self.modules.keys())
         self.ui.set_active_module(self.active_module)
         if update_python_text:
@@ -458,7 +561,7 @@ class App:
         self.file_handle = file_handle
         self.file_name = file_handle.name
         console.log(f'Opened {file_handle.name}.')
-        self.ui.set_loaded_file(file_handle.name)
+        self.ui.set_loaded_file(self.file_name)
 
     def load_html(self, contents):
         try:
@@ -470,9 +573,11 @@ class App:
         # Save copies so we can detect when edited
         self.orig_body = body
         self.orig_code = script
+        # Also set up active module
+        self.active_module = 'main'
         # Load successful
         self.ui.set_contents_html(body)
-        self.ui.set_contents_python(script)
+        self.ui.update_ui(update_python_text=True)
         return True
 
     def split_html(self, contents):
@@ -519,7 +624,7 @@ class App:
         await writable.write(full_html)
         await writable.close()
         console.log(f'Wrote {self.file_name}')
-        self.update_ui()
+        self.update_ui(update_python_text=True)
 
     def new_module(self, name, current_python_code):
         assert name not in self.modules
@@ -528,14 +633,13 @@ class App:
         self.modules[name] = ''
         self.update_ui(update_python_text=True)
 
-    async def import_module(self, file_handle, current_python_code):
+    async def import_module(self, name, file_handle, current_python_code):
         self.modules[self.active_module] = current_python_code
         f = await file_handle.getFile()
         contents = await f.text()
-        name = file_handle.name.replace('.py', '')
         self.modules[name] = contents.replace('\t', '    ')
         self.active_module = name
-        console.log(f'Imported {file_handle.name}.')
+        console.log(f'Imported {file_handle.name} as {name}')
         self.update_ui(update_python_text=True)
 
     async def export_module(self, file_handle, current_python_code):
@@ -543,7 +647,8 @@ class App:
         writable = await file_handle.createWritable()
         await writable.write(current_python_code)
         await writable.close()
-        console.log(f'Exported module {self.active_module} as {self.file_name}')
+        console.log(f'Exported module {self.active_module} as {file_handle.name}')
+        self.update_ui(update_python_text=True)
 
     def rename_module(self, new_name):
         assert new_name not in self.modules
@@ -552,12 +657,19 @@ class App:
         self.modules[new_name] = self.modules[old_name]
         del self.modules[old_name]
         self.active_module = new_name
+        console.log(f'Module {old_name} renamed to {new_name}')
         self.update_ui(update_python_text=False)
 
     def remove_module(self):
         assert len(self.modules) > 1
         del self.modules[self.active_module]
         self.active_module = 'main'
+        self.update_ui(update_python_text=True)
+
+    def select_module(self, name, current_python_code):
+        assert name in self.modules
+        self.modules[self.active_module] = current_python_code
+        self.active_module = name
         self.update_ui(update_python_text=True)
 
 
