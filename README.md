@@ -53,3 +53,5 @@ See the live version [here](https://robotfantastic.org/pywebedit/).
   encoded by pywebedit
 - Add [indentation markers](https://github.com/replit/codemirror-indentation-markers)
 - Don't add the stdlib if the python doesn't require it
+- Consider using brython's browser.widgets.menu to make more complex
+  menu interfaces
