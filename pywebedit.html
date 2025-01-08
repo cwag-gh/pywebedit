@@ -178,11 +178,9 @@ window.brython({'debug': 1, 'ids': ["pythoncode"]})
 </html>
 """
 
-MODULE_TEMPLATE = """
-%script% type="text/python" id="%moduleid%">
-%
-%endscript%
-"""
+MODULE_TEMPLATE = """%script% type="text/python" id="%moduleid%">
+%modulecode%
+%endscript%"""
 
 EXAMPLES = {
     "Interacting with HTML": [
@@ -212,7 +210,7 @@ PYFILES = [('main', 'main'),
            (None, None),
            ('Export this python module', '__export'),
            ('Rename this python module', '__rename'),
-           ('Remove this python module', '__remove')] # TODO: only add when there is more than one
+           ('Remove this python module', '__remove')]
 
 
 def add_option(select, title, value):
@@ -499,6 +497,9 @@ class UI:
         for title, value in pyfiles:
             add_option(select, title, value)
 
+    def set_focus_python(self):
+        self.python_editor.focus()
+
 
 class App:
     def __init__(self):
@@ -531,6 +532,7 @@ class App:
         self.ui.set_active_module(self.active_module)
         if update_python_text:
             self.ui.set_contents_python(self.modules[self.active_module])
+            self.ui.set_focus_python()
 
     async def load_example(self, name):
         # Assumes overwrite check has already been completed
@@ -592,13 +594,15 @@ class App:
 
     def build_html(self, html_body, python_code):
         """Build the full html text, inserting the user editable sections into the template."""
+        self.modules[self.active_module] = python_code
         module_texts = []
-        for module in self.modules:
-            if module == 'main':
+        for module_name, module_code in self.modules.items():
+            if module_name == 'main':
                 continue
             tagmap = {'script':    '<' + 'script',
                       'endscript': '<' + '/script>',
-                      'moduleid': f'__pwe_{module}'}
+                      'modulecode': module_code,
+                      'moduleid': f'__pwe_{module_name}'}
             m = MODULE_TEMPLATE
             for key, value in tagmap.items():
                 m = m.replace('%' + key + '%', value)
@@ -606,10 +610,10 @@ class App:
 
         tagmap = {'brython_version': BRYTHON_VERSION,
                   'html_body':       html_body,
-                  'python_code':     python_code,
+                  'python_code':     self.modules['main'],
                   'script':          '<' + 'script',
                   'endscript':       '<' + '/script>',
-                  'modules':         ', '.join(m for m in self.modules if m != 'main'),
+                  'modules':         ', '.join(f"'{m}'" for m in self.modules if m != 'main'),
                   'modulescripts':   '\n\n'.join(module_texts)}
         p = PAGE_TEMPLATE
         for key, value in tagmap.items():
@@ -617,6 +621,7 @@ class App:
         return p
 
     async def save_file(self, file_handle, html_body, python_code):
+        self.modules[self.active_module] = python_code
         self.file_handle = file_handle
         self.file_name = file_handle.name
         full_html = self.build_html(html_body, python_code)
