@@ -11,7 +11,7 @@ See the live version [here](https://robotfantastic.org/pywebedit/).
   install Linux, or anything
 - Have a way to keep everything local, in-browser, standalone, so we
   don't even need web access (sites like [replit](https://replit.com/)
-  are often blocked)
+  are often blocked and [runpython](https://runpython.org))
 - Make sure python errors are reported to the screen, as opposed to
   the developer console (also often blocked)
 - Allow distribution of resulting programs as standalone html files,
@@ -48,6 +48,8 @@ See the live version [here](https://robotfantastic.org/pywebedit/).
 - Add examples using pixi.js (fast 2d rendering engine, basis for
   Phaser.js)
   - Or consider Phaser.js
+  - https://buzz.jaysalvat.com/ for audio
+- https://ggame.readthedocs.io/en/latest/introduction.html
 - Add autosave?
 - Fix bug: If example fails to load, incorrectly states that it wasn't
   encoded by pywebedit
