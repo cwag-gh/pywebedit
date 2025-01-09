@@ -545,7 +545,7 @@ class App:
                   'python_code':     self.modules['main'],
                   'script':          '<' + 'script',
                   'endscript':       '<' + '/script>',
-                  'modules':         ', '.join(f"'{m}'" for m in self.modules if m != 'main'),
+                  'modules':         ', '.join(f"'__pwe_{m}'" for m in self.modules if m != 'main'),
                   'modulescripts':   '\n\n'.join(module_texts)}
         p = PAGE_TEMPLATE
         for key, value in tagmap.items():
