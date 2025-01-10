@@ -1,10 +1,13 @@
-
 <!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
 <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython.min.js"></script>
+<script> typeof brython === "undefined" && document.write('<script src="brython.min.js">\x3C/script>')</script>
+
 <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython_stdlib.js"></script>
+<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write('<script src="brython_stdlib.js">\x3C/script>')</script>
+
 
 <script type="text/javascript">
 function __brython_pre_then_code() {
@@ -35,41 +38,21 @@ class __ErrorReporter:
         self.errdiv.textContent += ("\n" + msg)
 sys.stderr = __ErrorReporter()
 
+# Load modules - use runPythonSource as it is synchronous
+for module in ['__pwe_game1']:
+    __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
+
+# Now run main code
 window.brython({'debug': 1, 'ids': ["pythoncode"]})
 </script>
 
-<script type="text/python" id="pythoncode">
-import math
-from browser import document, window, aio
+<script type="text/python" id="__pwe_game1">
+CTX = None
 
 
-CTX = document['canvas'].getContext('2d')
-WD = document['canvas'].width
-HT = document['canvas'].height
-#CTX.translate(0.5, 0.5) # Trick to make line drawing a bit better
-
-dt = 0.5
-
-xmargin = 200
-ymargin = 30
-a = 150
-b = 200
-c = math.sqrt(a*a + b*b)
-d = a*a / c
-theta = math.atan(a/b)
-
-A = (xmargin + a, ymargin + a + b)
-B = (xmargin + a + b, ymargin + b)
-C = (A[0] + a, A[1] + b)
-D = (B[0] + a, B[1] + b)
-E = (xmargin + a, ymargin + b)
-F = (C[0] + d * math.cos(theta),
-     C[1] - d * math.sin(theta))
-G = (xmargin, ymargin + a + b)
-H = (xmargin + a + b, ymargin)
-I = (xmargin, ymargin + b)
-J = (xmargin + a, ymargin)
-
+def set_context(ctx):
+    global CTX
+    CTX = ctx
 
 def draw_line(x1, y1, x2, y2, color='black', width=1):
     "Draw a line from (x1,y1) to (x2,y2)"
@@ -146,7 +129,37 @@ def clear():
     "Clear the entire canvas"
     canvas = CTX.canvas
     CTX.clearRect(0, 0, canvas.width, canvas.height)
+</script>
 
+<script type="text/python" id="pythoncode">
+import math
+from browser import document, window, aio
+from game1 import *
+
+WD = document['canvas'].width
+HT = document['canvas'].height
+
+dt = 0.5
+
+xmargin = 200
+ymargin = 30
+a = 150
+b = 200
+c = math.sqrt(a*a + b*b)
+d = a*a / c
+theta = math.atan(a/b)
+
+A = (xmargin + a, ymargin + a + b)
+B = (xmargin + a + b, ymargin + b)
+C = (A[0] + a, A[1] + b)
+D = (B[0] + a, B[1] + b)
+E = (xmargin + a, ymargin + b)
+F = (C[0] + d * math.cos(theta),
+     C[1] - d * math.sin(theta))
+G = (xmargin, ymargin + a + b)
+H = (xmargin + a + b, ymargin)
+I = (xmargin, ymargin + b)
+J = (xmargin + a, ymargin)
 
 def title():
     draw_text("Euclid's proof of the Pythagorean Theorem",
@@ -160,6 +173,8 @@ def triangle_labels():
     
     
 async def main():
+    set_context(document['canvas'].getContext('2d'))
+    
     title()
     triangle_labels()
     draw_triangle(A, E, B)
@@ -220,8 +235,7 @@ async def main():
     draw_text("suckers", WD/2, HT/2 + 1.05 * fontsize/2, 
               font_size=fontsize, font_family=family, bold=True)
     
-aio.run(main()) 
-# window.requestAnimationFrame(update_and_draw)
+aio.run(main())
 </script>
 </body>
 </html>
