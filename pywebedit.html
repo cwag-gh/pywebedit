@@ -118,13 +118,14 @@ HELP = f"""
     <li><a href="https://codemirror.net/">Codemirror</a> editor component (v6)</li>
   </ul>
 </div>
-"""
+""".strip()
 
 # Template for generated final page. Do not include script tags, which
 # screws up the html in python in html. Use alternate replacement
 # syntax (other than format()) to avoid syntax conflicts. Note the
 # second level of indirection when defining the fallback script tags.
-PAGE_TEMPLATE = """<!doctype html>
+PAGE_TEMPLATE = """
+<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -144,7 +145,6 @@ function __brython_pre_then_code() {
 
 <body onload="__brython_pre_then_code()">
 %html_body%
-
 %script% type="text/python" id="brythonpre">
 from browser import document, window
 
@@ -175,11 +175,13 @@ window.brython({'debug': 1, 'ids': ["pythoncode"]})
 %endscript%
 </body>
 </html>
-"""
+""".strip()
 
-MODULE_TEMPLATE = """%script% type="text/python" id="%moduleid%">
+MODULE_TEMPLATE = """
+%script% type="text/python" id="%moduleid%">
 %modulecode%
-%endscript%"""
+%endscript%
+""".strip()
 
 EXAMPLES = {
     "Interacting with HTML": [
@@ -426,8 +428,8 @@ class UI:
         # Since we really use this as a menu, automatically return to first choice.
         # Don't want to have to deal with situation where an example has been
         # modified - do we change the example choice or not?
-        self.set_example_choice('')
         self.warn_if_modified(onok=self.app.load_example(evt.target.value))
+        self.set_example_choice('')
 
     def on_help(self, evt):
         self.msg('Help', HELP, top=100, left=200)
@@ -593,6 +595,9 @@ class App:
         body, skip, *modfragments, script_and_foot = body_and_scripts.split(
             '<' + 'script type="text/python" id=')
 
+        # Body has extra line - remove it
+        body = '\n'.join(body.splitlines()[1:])
+
         modules = {}
         lines = script_and_foot.strip().splitlines()
         script = '\n'.join(lines[1:-3])
@@ -622,7 +627,7 @@ class App:
             module_texts.append(m)
 
         tagmap = {'brython_version': BRYTHON_VERSION,
-                  'html_body':       html_body.strip(),
+                  'html_body':       html_body,
                   'python_code':     self.modules['main'],
                   'script':          '<' + 'script',
                   'endscript':       '<' + '/script>',
