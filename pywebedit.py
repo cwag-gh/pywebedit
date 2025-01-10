@@ -128,11 +128,13 @@ EXAMPLES = {
         ("pixelperfect", "Perfect pixel-aligned drawing"),
     ],
     "Using javascript libraries": [
+        ("pixi", "Fast 2D graphics (pixi.js)"),
         ("three", "3D spinning cube (three.js)"),
     ],
-    "Games": [
+    "Games and demos": [
         ("breakout", "Brick breaking"),
         ("lightcycles", "Lightcycles"),
+        ("sphere", "Decode messages from Sphere"),
     ],
 }
 

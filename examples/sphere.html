@@ -1,0 +1,238 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython.min.js"></script>
+<script> typeof brython === "undefined" && document.write('<script src="brython.min.js">\x3C/script>')</script>
+
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython_stdlib.js"></script>
+<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write('<script src="brython_stdlib.js">\x3C/script>')</script>
+
+
+<script type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+}
+</script>
+</head>
+
+<body onload="__brython_pre_then_code()">
+<link rel="stylesheet" 
+    href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+
+<style>
+    html,body {
+        height: 100vh;
+    }
+    body>footer {
+        position: sticky;
+        top: 100vh;
+    }
+    .secondary {
+        background-color: transparent;
+        border: 1px solid #ccc;
+        color: #aaa;
+    }
+</style>
+
+<main class="container">
+<hgroup>
+    <h2>Sphere Code</h2>
+    <h3>Encode and decode messages using the code described in 
+        Michael Chrichton's 
+        <a href="https://en.wikipedia.org/wiki/Sphere_(novel)">Sphere</a></h3>
+</hgroup>
+
+<div class="grid">
+  <div>
+    <label for="encodeInput">Enter text to encode:</label>
+    <input 
+        type="text" 
+        id="encodeInput" 
+        name="encodeInput" 
+        placeholder="Your text here" 
+        aria-label="Text to encode" 
+        required>
+    <button id="btn_encode">Encode</button>
+    <p id="encodedText">Encoded text will appear here</p>
+    <div>
+      <button id="btnenc_ex1" class="secondary">
+          Example: Hello. How are you? I am fine. What is your name? My name is Harry.
+      </button>
+      <button id="btnenc_ex2" class="secondary">
+          Example: This is a program about encoding and decoding.
+      </button>
+      <button id="btnenc_ex3" class="secondary">
+          Example: Pneumonoultramicroscopicsilicovolcanoconiosis
+      </button>
+    </div>
+  </div>
+  <div>
+    <label for="decodeInput">Enter text to decode:</label>
+    <input 
+        type="text" 
+        id="decodeInput" 
+        name="decodeInput" 
+        placeholder="Your text here" 
+        aria-label="Text to decode" 
+        required>
+    <button id="btn_decode">Decode</button>
+    <p id="decodedText">Decoded text will appear here</p>
+    <div>
+      <button id="btndec_ex1" class="secondary">
+          Example: 000330131304</button>
+      <button id="btndec_ex2" class="secondary">
+          Example: 0005031822 1822 3008 21081526142114 1621222230012132</button>
+      <button id="btndec_ex3" class="secondary">
+          Example: 001805 1822 2108152614211432</button>
+    </div>
+  </div>
+</div>
+</main>
+
+<footer class="container">
+<small>[by tommy]</small>
+</footer>
+
+<script type="text/python" id="brythonpre">
+from browser import document, window
+
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\n" + msg)
+sys.stderr = __ErrorReporter()
+
+# Load modules - use runPythonSource as it is synchronous
+for module in []:
+    __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
+
+# Now run main code
+window.brython({'debug': 1, 'ids': ["pythoncode"]})
+</script>
+
+
+
+<script type="text/python" id="pythoncode">
+import browser
+from browser import document, bind
+
+# See page 182 in Sphere
+
+SC = {' ': ' ',
+      '01': 'G',
+      '02': 'B',
+      '03': 'H',
+      '04': 'Y',
+      '05': 'T',
+      '06': 'F',
+      '07': 'V',
+      '08': 'N',
+      '09': 'J',
+      '10': 'U',
+      '11': '7',
+      '12': '6',
+      '13': 'R',
+      '14': 'D',
+      '15': 'C',
+      '16': 'M',
+      '17': 'K',
+      '18': 'I',
+      '19': '5',
+      '20': '4',
+      '21': 'E',
+      '22': 'S',
+      '23': 'X',
+      '24': ',',
+      '25': 'L',
+      '26': 'O',
+      '27': '9',
+      '28': '8',
+      '29': 'W',
+      '30': 'A',
+      '31': 'Z',
+      '32': '.',
+      '33': '3',
+      '34': ';',
+      '35': 'P',
+      '36': '0',
+      '37': '?',
+      '38': '2',
+      '39': '1',
+      '40': 'Q',
+      '41': '~',
+      '42': '!',
+      '43': '$'
+      }
+
+ENSC = {value: key for key, value in SC.items()}
+
+# Pg 166
+def decode(msg):
+    global SC
+    output = ''
+    i = 2
+    while True:
+        if i > len(msg) -1:
+            break
+        count_on = 2
+        if msg[i] == ' ':
+            count_on = 1
+            output += SC[msg[i]]
+        else:
+            code = msg[i:i+2]
+            output += SC.get(code,'#')
+
+        i += count_on
+    return output
+
+def encode(msg):
+    global ENSC
+    output = ''
+    for i in range(0, len(msg), 1):
+        code = msg[i:i+1]
+        output += ENSC.get(code.upper(),'#')
+    return '00' + output
+
+
+@bind(document['btn_encode'], 'click')
+def btn_encode(_):
+  document['encodedText'].innerText = encode(str((document['encodeInput'].value).strip()))
+
+@bind(document['btn_decode'], 'click')
+def btn_decode(_):
+  document['decodedText'].innerText = decode(str((document['decodeInput'].value).strip()))
+
+@bind(document['btnenc_ex1'], 'click')
+def fill_encode_example_1(_):
+  document['encodeInput'].value = str(document['btnenc_ex1'].innerText).replace("Example: ", "")
+
+@bind(document['btnenc_ex2'], 'click')
+def fill_encode_example_1(_):
+  document['encodeInput'].value = str(document['btnenc_ex2'].innerText).replace("Example: ", "")
+
+@bind(document['btnenc_ex3'], 'click')
+def fill_encode_example_1(_):
+  document['encodeInput'].value = str(document['btnenc_ex3'].innerText).replace("Example: ", "")
+
+@bind(document['btndec_ex1'], 'click')
+def fill_decode_example_1(_):
+  document['decodeInput'].value = str(document['btndec_ex1'].innerText).replace("Example: ", "")
+
+@bind(document['btndec_ex2'], 'click')
+def fill_decode_example_1(_):
+  document['decodeInput'].value = str(document['btndec_ex2'].innerText).replace("Example: ", "")
+
+@bind(document['btndec_ex3'], 'click')
+def fill_decode_example_1(_):
+  document['decodeInput'].value = str(document['btndec_ex3'].innerText).replace("Example: ", "")
+
+</script>
+</body>
+</html>

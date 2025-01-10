@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython.min.js"></script>
+<script> typeof brython === "undefined" && document.write('<script src="brython.min.js">\x3C/script>')</script>
+
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython_stdlib.js"></script>
+<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write('<script src="brython_stdlib.js">\x3C/script>')</script>
+
+
+<script type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+}
+</script>
+</head>
+
+<body onload="__brython_pre_then_code()">
+<script
+src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.6.6/pixi.min.js">
+</script>
+
+<style>
+    body { margin: 0; 
+           overflow: hidden;
+         }
+</style>
+
+<script type="text/python" id="brythonpre">
+from browser import document, window
+
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\n" + msg)
+sys.stderr = __ErrorReporter()
+
+# Load modules - use runPythonSource as it is synchronous
+for module in []:
+    __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
+
+# Now run main code
+window.brython({'debug': 1, 'ids': ["pythoncode"]})
+</script>
+
+
+
+<script type="text/python" id="pythoncode">
+from browser import document, window, aio
+
+PIXI = window.PIXI
+
+async def main():
+    # Create a new application
+    app = PIXI.Application.new()
+    # Initialize the application
+    await app.init({"background": '#1099bb', "resizeTo": window})
+    # Append the application canvas to the document body
+    document.body.appendChild(app.canvas)
+    
+    # Create and add a container to the stage
+    container = PIXI.Container.new()
+    app.stage.addChild(container)
+    
+    # Load the bunny texture
+    texture = await PIXI.Assets.load('https://pixijs.com/assets/bunny.png')
+    
+    # Create a 5x5 grid of bunnies in the container
+    for i in range(25):
+        bunny = PIXI.Sprite.new(texture)
+        bunny.x = (i % 5) * 40
+        bunny.y = (i // 5) * 40
+        container.addChild(bunny)
+    
+    # Move container to the center
+    container.x = app.screen.width / 2
+    container.y = app.screen.height / 2
+    
+    # Center bunny sprites in local container coordinates
+    container.pivot.x = container.width / 2
+    container.pivot.y = container.height / 2
+    
+    def animate(time):
+        container.rotation -= 0.01 * time.deltaTime
+    
+    app.ticker.add(animate)
+
+# Start the async main function
+aio.run(main())
+</script>
+</body>
+</html>
