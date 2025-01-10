@@ -273,6 +273,8 @@ class UI:
             self.err('Module names must be no more than 20 letters.', title)
         elif name.startswith('__'):
             self.err('Module names must not start with two underscores.', title)
+        elif not name.replace('_', '').isalnum():
+            self.err('Module names must only include letters, numbers, and underscores.', title)
         elif with_existing_check and name in self.app.modules:
             self.err('Module name already exists.', title)
         else:
@@ -353,10 +355,14 @@ class UI:
             self.app.select_module(module, self.contents_python())
 
     def on_example_select(self, evt):
+        # Since we really use this as a menu, automatically return to first choice.
+        # Don't want to have to deal with situation where an example has been
+        # modified - do we change the example choice or not?
+        self.set_example_choice('')
         self.warn_if_modified(onok=self.app.load_example(evt.target.value))
 
     def on_help(self, evt):
-        self.msg('Help', HELP)
+        self.msg('Help', HELP, top=100, left=200)
 
     def warn_if_modified(self, onok):
         if self.app.anything_modified(self.contents_html(), self.contents_python()):
@@ -383,11 +389,11 @@ class UI:
             if value:
                 onok(value)
 
-    def msg(self, title, text):
-        d = InfoDialog(title, text, ok='Ok')
+    def msg(self, title, text, top=None, left=None):
+        d = InfoDialog(title, text, ok='Ok', top=top, left=left)
 
-    def err(self, text):
-        self.msg('Unfortunately...', text)
+    def err(self, text, title='Unfortunately...'):
+        self.msg(title, text)
 
     def erropen(self):
         self.err('This browser does not support opening and saving local files. Try Chrome.')
@@ -482,8 +488,6 @@ class App:
         except Exception as e:
             console.log(str(e))
             self.ui.err(f'Unable to load {relative_url} from the server.')
-        # For all unsuccessful cases, set the combo box back to default
-        self.ui.set_example_choice('')
 
     async def open_file(self, file_handle):
         f = await file_handle.getFile()
