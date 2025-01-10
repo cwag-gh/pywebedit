@@ -1,10 +1,13 @@
-
 <!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
 <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython.min.js"></script>
+<script> typeof brython === "undefined" && document.write('<script src="brython.min.js">\x3C/script>')</script>
+
 <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython_stdlib.js"></script>
+<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write('<script src="brython_stdlib.js">\x3C/script>')</script>
+
 
 <script type="text/javascript">
 function __brython_pre_then_code() {
@@ -14,10 +17,15 @@ function __brython_pre_then_code() {
 </head>
 
 <body onload="__brython_pre_then_code()">
+<style> 
+    html, body { background-color: #999999; } 
+</style>
+
+<div id="text"></div>
 <div align="center">
 <canvas id="canvas" 
-        width="1210" 
-        height="810"></canvas>
+        width="1110" 
+        height="690"></canvas>
 </div>
 
 <script type="text/python" id="brythonpre">
@@ -35,8 +43,15 @@ class __ErrorReporter:
         self.errdiv.textContent += ("\n" + msg)
 sys.stderr = __ErrorReporter()
 
+# Load modules - use runPythonSource as it is synchronous
+for module in []:
+    __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
+
+# Now run main code
 window.brython({'debug': 1, 'ids': ["pythoncode"]})
 </script>
+
+
 
 <script type="text/python" id="pythoncode">
 import math
@@ -47,20 +62,30 @@ CTX = document['canvas'].getContext('2d')
 HEIGHT = document['canvas'].height
 WIDTH = document['canvas'].width
 
+WHITE = 'rgb(255,255,255)'
+ORNG  = 'rgb(255,80,0)'
+BLU   = 'rgb(0,0,255)'
+LORNG = 'rgb(255,210,180)'
+LBLU  = 'rgb(150,150,255)'
+LGRN  = 'rgb(150,255,150)'
+YLO   = 'rgb(255,255,0)'
+
+startdelay = 5
+ready = False
+p1end = False
+p2end = False
+delloop = 0
+gametime = 120
 timestamp = None
+GRDWIDTH = int((WIDTH-10)/10)
+GRDHEIGHT = int((HEIGHT-10)/10)
 tick = 0
 gridsetup = []
 grid = []
 p1dir = 1
 p2dir = 3
-p1pos= [[1,0],[0,0]]
-p2pos= [[119,80],[120,80]]
-WHITE = 'rgb(255,255,255)'
-ORNG = 'rgb(255,80,0)'
-BLU = 'rgb(0,0,255)'
-LORNG= 'rgb(255,210,180)'
-LBLU= 'rgb(150,150,255)'
-LGRN= 'rgb(150,255,150)'
+p1pos= [[1,0], [0,0]]
+p2pos= [[GRDWIDTH-1,GRDHEIGHT],[GRDWIDTH,GRDHEIGHT]]
 gamecon = 0
 p1timeloop = 0
 p2timeloop = 0
@@ -72,12 +97,8 @@ scorecount = False
 timeout = 0.0
 timeoutwalls = 0
 exploderadius =5
-YLO = 'rgb(255,255,0)'
 hitwalls= False
 explodeparticles = []
-# bike = tone.create('G3',10)
-# trail = tone.create('C4',10)
-# splode = tone.create('Bb4',1)
 p1speed = 0.050
 p2speed = 0.050
 accel = 0.0005
@@ -168,14 +189,20 @@ def draw_text(text, x, y, color='black', font_size=12, font_family='Arial',
     
 
 def resetgame():
-    global tick,p1dir,p2dir,p1pos,p2pos,gamecon,grid,gridsetup,scorecount,timeout
-    global timeoutwalls,hitwalls,p1speed,p2speed
+    global tick, p1dir, p2dir, p1pos, p2pos, gamecon,grid,gridsetup,scorecount,timeout
+    global timeoutwalls,hitwalls,p1speed,p2speed,gamewin, p1score,p2score,delloop,p1end, p2end
     gridsetup = []
     grid = []
     p1dir = 1
+    p1end = False
+    p2end = False
     p2dir = 3
-    p1pos= [[1,0],[0,0]]
-    p2pos= [[119,80],[120,80]]
+    if gametime - int(round(delloop)) < 0:
+        p1score = 0
+        p2score = 0
+        delloop = 0
+    p1pos= [[1, 0], [0, 0]]
+    p2pos= [[GRDWIDTH - 1, GRDHEIGHT],[GRDWIDTH, GRDHEIGHT]]
     gamecon = 0
     setupgrid()
     scorecount = False
@@ -187,38 +214,43 @@ def resetgame():
     
     
 def setupgrid():
-    for x in range(0,121):
+    for x in range(0,GRDWIDTH+1):
         gridsetup.append(0)
-    for x in range(0,81):
+    for x in range(0,GRDHEIGHT+1):
         grid.append(list(gridsetup))
     
         
 def update(dt):
-    global p1timeloop, tick, gamecon, timeout, explodeparticles, p2timeloop, p1speed, p2speed
+    global p1timeloop, tick, gamecon, timeout, explodeparticles, p2timeloop, p1speed, p2speed, delloop, ready
     p1timeloop += dt
     p2timeloop += dt
+    delloop +=dt
+    document['text'].textContent = ''
+    if not ready:
+        document['text'].textContent = ('Ready! p1 is WASD, v for trail. p2 is IJKL and "." for trail. '
+                                        'Make the other bike hit a trail and do not hit the walls. '
+                                        '"r" to go to next round.')
+        return
     update_actual(dt)
     if gamecon > 0:
+        delloop -= dt
         if keyboard.r:
             resetgame()
             return
-        if not hitwalls and gamecon == 1:
+        if gamecon == 1:
             explodeparticles = []
-            for x in range(0,5):
-                explodedist = random.randint(-exploderadius,exploderadius)
-                explodeturn = random.randint(-(exploderadius-abs(explodedist)),  exploderadius-abs(explodedist))
+            for x in range(0, 5):
+                explodedist = random.randint(-exploderadius, exploderadius)
+                explodeturn = random.randint(-(exploderadius-abs(explodedist)), exploderadius-abs(explodedist))
                 explodeparticles.append((p2pos[0][0] + explodedist)*10)
                 explodeparticles.append((p2pos[0][1] + explodeturn)*10)
-        if not hitwalls and gamecon == 2:
+        if gamecon == 2:
             explodeparticles = []
             for x in range(0,5):
-                explodedist = random.randint(-exploderadius,exploderadius)
+                explodedist = random.randint(-exploderadius, exploderadius)
                 explodeturn = random.randint(-(exploderadius-abs(explodedist)), exploderadius-abs(explodedist))
                 explodeparticles.append((p1pos[0][0] + explodedist)*10)
                 explodeparticles.append((p1pos[0][1] + explodeturn)*10)
-        
-        #bike.stop()
-        #trail.stop()
         return
     
     if p1timeloop >= p1speed:
@@ -255,11 +287,10 @@ def update_motion_p1():
     
     if p1trail:
         grid[p1pos[1][1]][p1pos[1][0]] = 1
-        
-        
+             
         
 def update_motion_p2():
-    global tick,p1dir,p2dir,p1pos,p2pos,gamecon,p1trail,p2trail,p1speed,p2speed
+    global tick,p1dir,p2dir,p1pos,p2pos,gamecon,p1trail,p2trail,p1speed,p2speed,p1win,p2win
     
     #p2 direction execution
     if p2dir == 0:
@@ -288,13 +319,13 @@ def update_motion_p2():
     
         
 def update_actual(dt):
-    global tick,p1dir,p2dir,p1pos,p2pos,gamecon,p1trail,p2trail,timeout,timeoutwalls,hitwalls,p1speed,p2speed
+    global tick,p1dir,p2dir,p1pos,p2pos,gamecon,p1trail,p2trail,timeout,timeoutwalls,hitwalls,p1speed,p2speed,p1end,p2end
+    p2win = False
+    p1win = False
     if tick == 0:
         setupgrid()
-#         time.sleep(2)
         
-    
-    #p1 driving direction
+    # p1 driving direction
     if keyboard.w and not p1dir == 0:
         p1dir = 0
         p1speed = 0.050
@@ -308,8 +339,7 @@ def update_actual(dt):
         p1dir = 3
         p1speed = 0.050
         
-
-    #p2 stuff    
+    # p2 stuff    
     if keyboard.i and not p2dir == 0:
         p2dir = 0
         p2speed = 0.050
@@ -323,55 +353,67 @@ def update_actual(dt):
         p2dir = 3
         p2speed = 0.050
         
-    
-    #leave the grid, die a horrible death
-    if p1pos[0][0] < 0 or p1pos[0][0] > 120 or p1pos[0][1] < 0 or p1pos[0][1] > 80:
-        gamecon = 2
-        hitwalls = True
+    # leave the grid, die a horrible death
+    if not p1end:
+        if p1pos[0][0] < 0 or p1pos[0][0] > GRDWIDTH or p1pos[0][1] < 0 or p1pos[0][1] > GRDHEIGHT:
+            p2win = True
+            hitwalls = True
+            p1end = True
         
-        return
-    if p2pos[0][0] < 0 or p2pos[0][0] > 120 or p2pos[0][1] < 0 or p2pos[0][1] > 80:
-        gamecon = 1
-        hitwalls = True
-        
-        return
-    #p1&2 trails
-    p1trail = False
-    p2trail = False
-    timeout += dt
-    if keyboard.v:
-        p1trail = True
-        timeout = 0.0
-    if keyboard.slash:
-        p2trail = True
-        timeout = 0.0
-    if timeout >= 5.0 and gamecon < 1:
-        for y in range(0,81):
-            grid[y][timeoutwalls]  = 3
-            grid[y][120 - timeoutwalls] = 3
-        timeoutwalls +=1
-        timeout -= 1.0
-    
-    #hit a trail, die a less horrible death bc you gave it a shot
-    if grid[p1pos[0][1]][p1pos[0][0]] >= 1:
-        gamecon = 2
-#         window.alert("p2 won")
-        
-        return
-    if grid[p2pos[0][1]][p2pos[0][0]] >= 1:
-        gamecon = 1
-#         window.alert("P1 won")
-        
-        return
+    if not p2end:
+        if p2pos[0][0] < 0 or p2pos[0][0] > GRDWIDTH or p2pos[0][1] < 0 or p2pos[0][1] > GRDHEIGHT:
+            p1win = True
+            hitwalls = True
+            p2end = True
            
+    # p1&2 trails
+    if not (p1end or p2end):
+        p1trail = False
+        p2trail = False
+        timeout += dt
+        if keyboard.v:
+            p1trail = True
+            timeout = 0.0
+        if keyboard.slash:
+            p2trail = True
+            timeout = 0.0
+        if timeout >= 5.0 and gamecon < 1:
+            for y in range(0,GRDHEIGHT+1):
+                grid[y][timeoutwalls]  = 3
+                grid[y][GRDWIDTH - timeoutwalls] = 3
+            timeoutwalls +=1
+            timeout -= 1.0
+    
+    # hit a trail, die a less horrible death bc you gave it a shot
+    if not p1end:
+        if grid[p1pos[0][1]][p1pos[0][0]] >= 1:
+            p2win = True
+            p1end = True
+        
+    if not p2end :
+        if grid[p2pos[0][1]][p2pos[0][0]] >= 1:
+            p1win = True
+            p2end = True
+            
+    if p1end or p2end:
+        if p1win and p2win:
+            gamecon = 3
+        elif p1win:
+            gamecon = 1
+        elif p2win: 
+            gamecon = 2
+        p1end = True
+        p2end = True
+    
     
 def draw():
-    global gamecon,p1score,p2score,scorecount,exploderadius,explodeparticles
+    global gamecon,p1score,p2score,scorecount,exploderadius,explodeparticles,gamewin,delloop,p2win,p1win
     explodedist = 0
     clear()
+
     set_background()
-    for x in range(0,121):
-        for y in range(0,81):
+    for x in range(0,GRDWIDTH+1):
+        for y in range(0,GRDHEIGHT+1):
             if grid[y][x] == 1:
                 draw_rect(x*10,y*10,10,10,LORNG)
             if grid[y][x] == 2:
@@ -383,55 +425,69 @@ def draw():
     draw_rect(p1pos[1][0]*10,p1pos[1][1]*10,10,10,ORNG)
     draw_rect(p2pos[0][0]*10,p2pos[0][1]*10,10,10,BLU)
     draw_rect(p2pos[1][0]*10,p2pos[1][1]*10,10,10,BLU)
-    draw_text(f"SCORE: ORANGE {p1score}/{p2score} BLUE", 470, 10, color='green')
+    gametimedisplay = lambda a, b: str(b - round(a)) if b - round(a) >= 0 else "FINAL ROUND" if round(a) % 2 == 0 else "                        "
+    draw_text(f"SCORE: ORANGE {p1score}/{p2score} BLUE {gametimedisplay(delloop,gametime)}", (WIDTH/2)-120, 10, color='green')
     if gamecon == 1:
-        draw_text("P1 WINNER! \n HAPPY BIRTHDAY THOMAS!", 500, 350, color='green')
-        if not hitwalls:
-            for x in range(0,5):
-                explodedist = random.randint(-exploderadius,exploderadius)
-                explodeturn = exploderadius-abs(explodedist)
-                draw_rect(explodeparticles[x*2],explodeparticles[x*2+1],10,10,YLO)               
-            
+        draw_text("P1 Won the round!", WIDTH/2-100, HEIGHT/2, color='green') 
+        for x in range(0,5):
+            explodedist = random.randint(-exploderadius,exploderadius)
+            explodeturn = exploderadius-abs(explodedist)
+            draw_rect(explodeparticles[x*2],explodeparticles[x*2+1],10,10,YLO)               
+
         if not scorecount:
             p1score += 1
             scorecount = True
     if gamecon == 2:
-        draw_text("P2 WINNER! \n HAPPY BIRTHDAY THOMAS!", 500, 350, color='green')
-        if not hitwalls:
-            for x in range(0,5):
-                explodedist = random.randint(-exploderadius,exploderadius)
-                explodeturn = exploderadius-abs(explodedist)
-                draw_rect(explodeparticles[x*2],explodeparticles[(x*2)+1],10,10,YLO)
-        
+        draw_text("P2 Won the round!", WIDTH/2-100, HEIGHT/2, color='green')
+        for x in range(0,5):
+            explodedist = random.randint(-exploderadius,exploderadius)
+            explodeturn = exploderadius-abs(explodedist)
+            draw_rect(explodeparticles[x*2],explodeparticles[(x*2)+1],10,10,YLO)
         if not scorecount:
             p2score += 1
             scorecount = True
-                
+            
+    if gamecon == 3:
+        draw_text("Tie round!", WIDTH/2-100, HEIGHT/2, color='green')
+        if not scorecount:
+            p2score += 1
+            p1score +=1
+            scorecount = True
+            
+    if gamecon > 0 and (gametime- int(round(delloop)))<0:
+        if p1score > p2score:
+            draw_text(f"P1 Won the GAME! Play again?",WIDTH/2-100,(HEIGHT/2)+10, color='green')
+        if p1score < p2score:
+               draw_text(f"P2 Won the GAME! Play again?",WIDTH/2-100,(HEIGHT/2)+10, color='green')
+        if p1score == p2score:
+            draw_text(f"Tie Game! Play Again?",WIDTH/2-100,(HEIGHT/2)+10, color='green')
+
     
 def loop(t):
-    global timestamp
+    global timestamp,tick,delloop,startdelay,ready
+    
     if timestamp is None:
         timestamp = t
         dt = 30
     else:
         dt = t - timestamp
         timestamp = t
+    
     update(dt / 1000.0)
-    draw()
+    if ready:
+        draw()
     window.requestAnimationFrame(loop)
     
     
 @bind(document, "keydown")
 def keyDownHandler(e):
-    global keyboard
+    global keyboard,ready
     if e.key.isalpha():
         setattr(keyboard, e.key, True)
     elif e.key == '.':
         keyboard.slash = True
-#     if e.keyCode == 39:
-#         panel.rightPressed = True
-#     elif e.keyCode == 37:
-#         panel.leftPressed = True
+    if not ready:
+        ready = True
 
         
 @bind(document, "keyup")
