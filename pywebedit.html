@@ -124,8 +124,7 @@ HELP = f"""
 # screws up the html in python in html. Use alternate replacement
 # syntax (other than format()) to avoid syntax conflicts. Note the
 # second level of indirection when defining the fallback script tags.
-PAGE_TEMPLATE = """
-<!doctype html>
+PAGE_TEMPLATE = """<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -567,30 +566,40 @@ class App:
 
     def load_html(self, contents):
         try:
-            body, script = self.split_html(contents)
+            body, modules = self.split_html(contents)
         except Exception as e:
             console.log(e)
             self.ui.err('Looks like this file was not saved by pywebedit. Unable to load.')
             return False
         # Save copies so we can detect when edited
         self.orig_body = body
-        self.orig_code = script
-        # Also set up active module
+        self.orig_modules = modules
+        # Set up modules and active module
+        self.modules = dict(modules)
         self.active_module = 'main'
         # Load successful
         self.ui.set_contents_html(body)
-        self.ui.update_ui(update_python_text=True)
+        self.update_ui(update_python_text=True)
         return True
 
     def split_html(self, contents):
-        """Split out header, python script out of saved html."""
-        body_and_script = contents.split('<body onload="__brython_pre_then_code()">')[1]
-        body = body_and_script.split(
-            '<' + 'script type="text/python" id="brythonpre">')[0].strip()
-        script_and_foot = body_and_script.split(
-            '<' + 'script type="text/python" id="pythoncode">')[1]
-        script = script_and_foot.split('<' + '/script>')[0].strip()
-        return body, script
+        """Split out header, python scripts from saved html."""
+        body_and_scripts = contents.split('<body onload="__brython_pre_then_code()">')[1]
+
+        body, skip, *modfragments, script_and_foot = body_and_scripts.split(
+            '<' + 'script type="text/python" id=')
+
+        modules = {}
+        lines = script_and_foot.strip().splitlines()
+        script = '\n'.join(lines[1:-3])
+        modules['main'] = script
+
+        for fragment in modfragments:
+            lines = fragment.splitlines()
+            modname = lines[0].replace('"__pwe_', '').replace('">', '')
+            modules[modname] = '\n'.join(lines[1:-2])
+
+        return body, modules
 
     def build_html(self, html_body, python_code):
         """Build the full html text, inserting the user editable sections into the template."""
@@ -609,7 +618,7 @@ class App:
             module_texts.append(m)
 
         tagmap = {'brython_version': BRYTHON_VERSION,
-                  'html_body':       html_body,
+                  'html_body':       html_body.strip(),
                   'python_code':     self.modules['main'],
                   'script':          '<' + 'script',
                   'endscript':       '<' + '/script>',
