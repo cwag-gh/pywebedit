@@ -17,6 +17,8 @@ See the live version [here](https://robotfantastic.org/pywebedit/).
 - Allow distribution of resulting programs as standalone html files,
   which can be run directly from the browser, and shared using Google
   Drive
+- These files should also be able to be run fully offline using the same
+  files as from the original download
 - Maximize vertical space for coding on a Chromebook
 
 
@@ -39,11 +41,11 @@ See the live version [here](https://robotfantastic.org/pywebedit/).
 
 ## TODO
 
+- Add examples as tutorials
+  - Variations on input
 - Fix behavior with long lines - editor grows, which may not be what
   we want
 - Add ability to have multiple python files
-- Add examples as tutorials
-  - Variations on input
 - Add all examples from Brython website?
 - Add examples using pixi.js (fast 2d rendering engine, basis for
   Phaser.js)
@@ -57,3 +59,15 @@ See the live version [here](https://robotfantastic.org/pywebedit/).
 - Don't add the stdlib if the python doesn't require it
 - Consider using brython's browser.widgets.menu to make more complex
   menu interfaces
+- Fix issue where mismatched tags in the body section will screw up
+  code generation. Need to parse it?
+
+New example order:
+- hello
+- input0 - basic input
+- basic_html - basic html
+- error - Error viewing
+- styled_html
+- bind - Running python based on events
+- modules - Organizing code
+- console - Simple control flow with async
