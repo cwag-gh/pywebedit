@@ -1,0 +1,156 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython.min.js"></script>
+<script> typeof brython === "undefined" && document.write('<script src="brython.min.js">\x3C/script>')</script>
+
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython_stdlib.js"></script>
+<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write('<script src="brython_stdlib.js">\x3C/script>')</script>
+
+
+<script type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+}
+</script>
+</head>
+
+<body onload="__brython_pre_then_code()">
+<!--
+One thing we often want to do is write programs that
+talk back and forth with the user, like a chatbot or an
+adventure game. Unfortunately, it's tricky because
+we can't use the normal python input()
+function in the browser, as it stops everything else from running
+when waiting for the user to input something. Same with
+time.sleep() -  also not allowed to use that in a webpage,
+because the browser and the webpage have to keep running in the
+background. (And, assuming we don't want to use the browser's
+input popup - that's... ugly).
+
+The workaround is to use "async" functions - functions that can
+run for a while, then stop in the middle to let other things
+happen while we wait (using the keyword await) for a
+particular event to occur.
+
+Here's an example of how we would write a program that
+takes input when we want, yet flows linearly in a single function.
+If you want to learn more about how it works, look at the
+implementation in picoconsole. Otherwise, this is a great
+starting point for a console-style application.
+-->
+
+<link rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+<link rel="stylesheet" href="pico.min.css">
+
+<main class="container">
+    <h2>Adventure</h2>
+    <div class="grid">
+        <section>
+            <textarea readonly id="output" rows="14" cols="100"></textarea>
+        </section>
+        <section>
+            <input type="text"
+                   id="input"
+                   placeholder="Type here...">
+            <button id="submit">Submit</button>
+        </section>
+    </div>
+</main>
+
+<footer class="container">
+    <small>[by yours truly]</small>
+</footer>
+<script type="text/python" id="brythonpre">
+from browser import document, window
+
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\n" + msg)
+sys.stderr = __ErrorReporter()
+
+# Load modules - use runPythonSource as it is synchronous
+for module in ['__pwe_picoconsole']:
+    __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
+
+# Now run main code
+window.brython({'debug': 1, 'ids': ["pythoncode"]})
+</script>
+
+<script type="text/python" id="__pwe_picoconsole">
+# Simple console style input/output handling.
+#
+# Assumes there are document elements with ids
+# 'input', 'output', and 'submit.'
+
+from browser import bind, document, window, aio
+
+@bind(document['input'], 'keypress')
+def oninputkey(event):
+    if event.key == 'Enter':
+        # Simulate the submit button being pressed
+        evt = window.MouseEvent.new('click')
+        document['submit'].dispatchEvent(evt)
+    event.stopPropagation()
+
+def enable_input(flag):
+    document['input'].disabled = not flag
+    document['submit'].disabled = not flag
+
+# We are replacing the normal print function, because we
+# want to be able to output to the screen.
+def print(s):
+    document['output'].value += str(s) + '\n'
+    # Keep scrolled to the bottom
+    document['output'].scrollTop = document['output'].scrollHeight
+
+async def get_input(s):
+    print(s)
+    enable_input(True)
+    document['input'].focus()
+    await aio.event(document['submit'], 'click')
+    inputval = document['input'].value
+    enable_input(False)
+    document['input'].value = ''
+    return inputval
+
+</script>
+
+<script type="text/python" id="pythoncode">
+from browser import document, aio
+from picoconsole import enable_input, get_input, print
+
+# This main function shows how we can write simple
+# linear code, and even use a sleep function,
+# close to how we would write a normal python command
+# line program with input().
+async def main():
+    enable_input(False)
+
+    print('Welcome to the adventure!')
+    print('')
+    name = await get_input('Choose a character name:')
+    print(f'Welcome {name}!')
+
+    # Wait a bit before moving on
+    await aio.sleep(1.0)
+
+    print('')
+    job = await get_input('Now, choose your occupation:')
+    print(f'Adventure awaits, {name} the {job}!')
+
+# Async functions can't be run directly. You need to use aio.run()
+# to start them off.
+aio.run(main())
+</script>
+</body>
+</html>

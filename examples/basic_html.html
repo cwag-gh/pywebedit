@@ -1,0 +1,108 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython.min.js"></script>
+<script> typeof brython === "undefined" && document.write('<script src="brython.min.js">\x3C/script>')</script>
+
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython_stdlib.js"></script>
+<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write('<script src="brython_stdlib.js">\x3C/script>')</script>
+
+
+<script type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+}
+</script>
+</head>
+
+<body onload="__brython_pre_then_code()">
+<!-- Here's an extended example with HTML. -->
+
+<!-- h1 tags are main headings, like titles. 
+     They get styled large by default. -->
+<h1 id='title'></h1>
+
+<!-- h2 tags (and h3 and so on) are sub-headings. 
+     They get styled somewhat smaller by default. -->
+<h2 id='subtitle'></h2>
+
+<!-- We use the id string to allow the python code on the
+     right to access the HTML regions on the left.
+
+     So, the title and subtitle ids let us fill in the
+     h1 and h2 content with python code.
+-->
+
+<!-- div tags are divisions in the web page - a grouping.
+     You can also have p tags to represent paragraphs. -->
+<div>
+    <p>What you are reading is my webpage. 
+       It's great, isn't it?</p>
+
+    <p>I thought so.</p>
+</div>
+
+<!-- Notice how there is a new line in the html code 
+     in the first paragraph above, but when it's rendered,
+     there is no new line. That's how HTML works - the 
+     html tags (the things in between the <> signs control
+     how the text actually looks like on the page.
+-->
+
+<!-- You can have buttons... -->
+<div>
+    <p>It has a button that does NOTHING:</p>
+    <button id="submit">Seriously...</button>
+</div>
+
+<!-- Input fields... -->
+<div>
+    <p>And an input field...</p>
+    <input type="text" placeholder="...that also does nothing">
+</div>
+
+<!-- Text areas... -->
+<div>
+    <p>And a big text area.</p>
+    <textarea rows="5" cols="100">You can type in me, but I do nothing.
+    </textarea>
+</div>
+<script type="text/python" id="brythonpre">
+from browser import document, window
+
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\n" + msg)
+sys.stderr = __ErrorReporter()
+
+# Load modules - use runPythonSource as it is synchronous
+for module in []:
+    __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
+
+# Now run main code
+window.brython({'debug': 1, 'ids': ["pythoncode"]})
+</script>
+
+
+
+<script type="text/python" id="pythoncode">
+from browser import document, html
+
+# We can fill in web page content with python 
+# (if you want) using the id of the HTML element.
+document['title'].textContent = 'Hello, World!'
+document['subtitle'].textContent = 'Welcome...'
+
+# You can even add new elements:
+document.body <= html.P("A last paragraph for you")
+</script>
+</body>
+</html>

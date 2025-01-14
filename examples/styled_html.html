@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython.min.js"></script>
+<script> typeof brython === "undefined" && document.write('<script src="brython.min.js">\x3C/script>')</script>
+
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython_stdlib.js"></script>
+<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write('<script src="brython_stdlib.js">\x3C/script>')</script>
+
+
+<script type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+}
+</script>
+</head>
+
+<body onload="__brython_pre_then_code()">
+<!-- 
+This is the almost same HTML and python as last time, 
+but we added a "stylesheet" which pre-defines some 
+styles and spacings. And, we wrapped everything in a
+<main> tag, which the stylesheet uses to arrange
+things nicely. Try resizing the window!
+
+We include the stylesheet twice so this can work
+when you are connected to the internet or disconnected
+(but using the standalone bundle of pywebedit).
+-->
+
+<link rel="stylesheet" 
+    href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+<link rel="stylesheet" href="pico.min.css">
+
+<main class="container">
+
+<h1 id='title'></h1>
+
+<h2 id='subtitle'></h2>
+
+<div>
+    <p>What you are reading is my webpage. 
+       It's great, isn't it?</p>
+
+    <p>I thought so.</p>
+</div>
+
+<div>
+    <p>It has a button that does NOTHING:</p>
+    <button id="submit">Seriously...</button>
+</div>
+
+<div>
+    <p>Or input fields...</p>
+    <input type="text" placeholder="...that also do nothing">
+</div>
+
+<div>
+    <p>Or big text areas!</p>
+    <textarea rows="5" cols="100">You can type in me, but I do nothing.
+    </textarea>
+</div>
+
+</main>
+<script type="text/python" id="brythonpre">
+from browser import document, window
+
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\n" + msg)
+sys.stderr = __ErrorReporter()
+
+# Load modules - use runPythonSource as it is synchronous
+for module in []:
+    __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
+
+# Now run main code
+window.brython({'debug': 1, 'ids': ["pythoncode"]})
+</script>
+
+
+
+<script type="text/python" id="pythoncode">
+from browser import document, html
+
+document['title'].textContent = 'Hello, World!'
+document['subtitle'].textContent = 'Welcome...'
+
+document.body <= html.P("A last paragraph for you")
+</script>
+</body>
+</html>

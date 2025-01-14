@@ -184,10 +184,20 @@ MODULE_TEMPLATE = """
 """.strip()
 
 EXAMPLES = {
+    "Getting started": [
+        ("hello", "1) Hello world"),
+        ("input0", "2) Basic input"),
+        ("basic_html", "3) Initial HTML"),
+        ("error", "4) Showing python errors"),
+        ("styled_html", "5) Styled HTML"),
+        ("bind", "5) Run python based on events"),
+        ("modules", "6) Organizing code into modules"),
+        ("console", "7) Simple control flow with async"),
+    ],
     "Interacting with HTML": [
-        ("hello", "Hello world"),
         ("calculator", "Calculator with styled buttons"),
         ("sort_table", "Table with sortable columns"),
+        ("sphere", "Decode messages from Sphere"),
     ],
     "Drawing and animating": [
         ("clock", "Analog clock"),
@@ -199,10 +209,9 @@ EXAMPLES = {
         ("pixi", "Fast 2D graphics (pixi.js)"),
         ("three", "3D spinning cube (three.js)"),
     ],
-    "Games and demos": [
+    "Games and interaction": [
         ("breakout", "Brick breaking"),
         ("lightcycles", "Lightcycles"),
-        ("sphere", "Decode messages from Sphere"),
     ],
 }
 

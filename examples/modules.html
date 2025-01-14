@@ -1,0 +1,103 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython.min.js"></script>
+<script> typeof brython === "undefined" && document.write('<script src="brython.min.js">\x3C/script>')</script>
+
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython_stdlib.js"></script>
+<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write('<script src="brython_stdlib.js">\x3C/script>')</script>
+
+
+<script type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+}
+</script>
+</head>
+
+<body onload="__brython_pre_then_code()">
+<!-- 
+pywebedit also lets you organize python code into modules,
+like separate files. This way you can separate out code that will
+be reused, or just separate out code for organization. These 
+modules can be exported as python files and imported to your 
+pywebedit webpage.
+
+We've separated out the "triple" function from the
+previous example into a separate module. We can import
+from this just like in regular python. Click on the
+dropdown box in the top center of the screen to choose
+a different module, or access other module functions.
+-->
+
+<link rel="stylesheet" 
+    href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+<link rel="stylesheet" href="pico.min.css">
+
+<main class="container">
+    <div class="grid">
+        <section>
+            <input type="text" 
+                   id="input" 
+                   placeholder="Enter a number...">
+            <button id="submit">Triple it</button>
+            <div id="output"></div>
+        </section>
+    </div>
+</main>
+  
+<footer class="container">
+    <small>[by yours truly]</small>
+</footer>
+<script type="text/python" id="brythonpre">
+from browser import document, window
+
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\n" + msg)
+sys.stderr = __ErrorReporter()
+
+# Load modules - use runPythonSource as it is synchronous
+for module in ['__pwe_mymodule']:
+    __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
+
+# Now run main code
+window.brython({'debug': 1, 'ids': ["pythoncode"]})
+</script>
+
+<script type="text/python" id="__pwe_mymodule">
+def triple(val):
+    return 3 * val
+</script>
+
+<script type="text/python" id="pythoncode">
+from browser import bind, document, window
+from mymodule import triple
+
+def onsubmit(event):
+    try:
+        v = int(str(document['input'].value).strip())
+        document['output'].innerText = str(triple(v))
+    except (TypeError, ValueError):
+        document['output'].innerText = 'Please input an integer'
+
+document['submit'].bind('click', onsubmit)
+
+@bind(document['input'], 'keypress')
+def oninputkey(event):
+    if event.key == 'Enter':
+        # Simulate the submit button being pressed
+        evt = window.MouseEvent.new('click')
+        document['submit'].dispatchEvent(evt)
+    event.stopPropagation()
+</script>
+</body>
+</html>
