@@ -1,0 +1,313 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython.min.js"></script>
+<script> typeof brython === "undefined" && document.write('<script src="brython.min.js">\x3C/script>')</script>
+
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython_stdlib.js"></script>
+<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write('<script src="brython_stdlib.js">\x3C/script>')</script>
+
+
+<script type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+}
+</script>
+</head>
+
+<body onload="__brython_pre_then_code()">
+<!-- Import pixi, with fallback to a local copy -->
+<script
+src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.6.6/pixi.min.js">
+</script>
+<script>typeof PIXI === "undefined" && 
+    document.write('<script src="pixi.min.js">\x3C/script>')</script>
+
+<style>
+body { margin: 0; 
+       overflow: hidden; }
+</style>
+
+<script type="text/python" id="brythonpre">
+from browser import document, window
+
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\n" + msg)
+sys.stderr = __ErrorReporter()
+
+# Load modules - use runPythonSource as it is synchronous
+for module in ['__pwe_pixi']:
+    __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
+
+# Now run main code
+window.brython({'debug': 1, 'ids': ["pythoncode"]})
+</script>
+
+<script type="text/python" id="__pwe_pixi">
+"""Wraps pixi interface to act more like pygame."""
+
+from browser import window, document, aio
+
+# Global state
+app = None
+drawing_container = None
+graphics = None
+update = None
+draw = None
+
+def run(update_fn, draw_fn, background_color, width, height):
+    """Start the game loop with the given update and draw functions."""
+    global update, draw
+    update = update_fn
+    draw = draw_fn
+    # Lightweight async wrapper
+    aio.run(setup_and_run(background_color, width, height))
+
+def _clear(ticker):
+    global drawing_container, graphics
+    # Remove all items that aren't the line graphics
+    for child in drawing_container.children:
+        if child != graphics:
+            child.destroy()
+    # Clear the drawn graphics container
+    graphics.clear()
+        
+def update_then_draw(ticker):
+    global update, draw
+    # Call the user's update function with a delta time argument
+    update(ticker.deltaMS)
+    # Then call the user's draw function, which will add items
+    # to the drawing container (it will actually get rendered
+    # later by Pixi)
+    draw()
+        
+async def setup_and_run(background_color, width, height):
+    global app, drawing_container, graphics
+    app = window.PIXI.Application.new()
+    await app.init({
+        'width': width,
+        'height': height,
+        'background': background_color, 
+        'resizeTo': window,
+        'antialias': True,  # Enable antialiasing
+        'resolution': window.devicePixelRatio or 1,  # Handle high DPI displays
+    })
+    document.body.appendChild(app.canvas)
+    # Create a top level container for things that will be
+    # added / cleared every tick
+    drawing_container = window.PIXI.Container.new()
+    app.stage.addChild(drawing_container)
+    # For simple graphics, can group all of these calls into
+    # one Graphics object
+    graphics = window.PIXI.Graphics.new()
+    drawing_container.addChild(graphics)
+    # TODO: load assets in async
+    app.ticker.add(_clear)
+    app.ticker.add(update_then_draw)
+
+
+def screen_center():
+    global app
+    w, h = screen_dimensions()
+    return (w / 2, h / 2)
+
+
+def screen_dimensions():
+    global app
+    dpr = window.devicePixelRatio or 1
+    return (app.canvas.width / dpr / 2, app.canvas.height / dpr / 2)
+    
+
+## The drawing functions
+
+def draw_line(x1, y1, x2, y2, color='black', width=1):
+    """Draw a line from (x1,y1) to (x2,y2)"""
+    global graphics
+    graphics.moveTo(x1, y1)
+    graphics.lineTo(x2, y2)
+    graphics.stroke({'width': width, 'color': color})
+    
+
+def draw_circle(x, y, radius, color='black', filled=False, width=1):
+    """Draw a circle centered at (x,y)"""
+    global graphics
+    graphics.circle(x, y, radius)
+    if filled:
+        fillcolor = color if isinstance(filled, bool) else filled            
+        graphics.fill({'color': fillcolor})
+    graphics.stroke({'width': width, 'color': color})
+
+
+def draw_rect(x, y, width, height, color='black', filled=False, linewidth=1):
+    """Draw a rectangle at (x,y)"""
+    global graphics
+    graphics.rect(x, y, width, height)
+    if filled:
+        fillcolor = color if isinstance(filled, bool) else filled            
+        graphics.fill({'color': fillcolor})
+    graphics.stroke({'width': linewidth, 'color': color})
+
+
+def draw_poly(pts, color, filled, linewidth):
+    pass
+
+
+def draw_text(text, x, y, color='black', font_size=12, font_family='Arial', 
+             centered=True, bold=False):
+    """Draw text at position (x,y)"""
+    global drawing_container
+    style = {
+        'fontFamily': font_family,
+        'fontSize': font_size,
+        'fill': color,
+        'fontWeight': 'bold' if bold else 'normal'
+    }
+    text_sprite = window.PIXI.Text.new(text, style)
+    if centered:
+        text_sprite.anchor.set(0.5, 0.5)
+    text_sprite.position.set(x, y)
+    drawing_container.addChild(text_sprite)
+    
+
+def draw_triangle(p1, p2, p3, color='black', width=1):
+    draw_line(*p1, *p2, color=color, width=width)
+    draw_line(*p2, *p3, color=color, width=width)
+    draw_line(*p3, *p1, color=color, width=width)
+
+
+</script>
+
+<script type="text/python" id="pythoncode">
+# In this example, we have wrapped Pixi.js into a library that works
+# a lot like pygame zero - you just need to use an update() and a
+# draw() function. 
+#
+# Note that this isn't the fastest way of using Pixi.js, as we are adding to
+# and subtracting from the scene graph on every frame.
+
+from browser import window
+import random
+import math
+
+import pixi
+
+# Star class to manage position and speed
+class Star:
+    def __init__(self):
+        self.reset()
+        
+    def reset(self):
+        self.x = random.randint(-400, 400)
+        self.y = random.randint(-300, 300)
+        self.z = random.randint(1, 1000)  # depth
+        self.speed = random.uniform(2, 5)
+
+
+class Circle:
+    def __init__(self, w, h):
+        self.x = random.randint(int(w/6), int(5/6 * w))
+        self.y = random.randint(int(h/6), int(5/6 * h))
+        self.r = random.randint(30, int(h/3))
+        self.line_color = (random.randint(128, 255) / 255.0,
+                           random.randint(128, 255) / 255.0,
+                           random.randint(128, 255) / 255.0,)
+        self.fill_color = (self.line_color[0] * 0.8,
+                           self.line_color[1] * 0.8,
+                           self.line_color[2] * 0.8)
+    
+
+# Setup stars
+stars = [Star() for _ in range(300)]
+time = 0
+# Timing between transitions
+durations_ms = [1600, # Initial blank
+                2500, # Title
+                2000, # Title shake
+                1000] # Blank
+transitions_ms = [durations_ms[0]]
+for d in durations_ms[1:]:
+    transitions_ms.append(transitions_ms[-1] + d)
+shape = None
+shape_t_start = transitions_ms[-1]
+shape_t_end = 0
+
+def update(dt):
+    global time, shape, shape_t_start, shape_t_end
+    time += dt
+    
+    # Update each star's position
+    for star in stars:
+        # Move star closer (smaller z)
+        star.z -= star.speed
+        
+        # Reset star if it's too close
+        if star.z <= 0:
+            star.reset()
+
+    if shape is None and time >= shape_t_start:
+        shape = Circle(*pixi.screen_dimensions())
+        shape_t_end = shape_t_start + 2000
+    elif shape is not None and time >= shape_t_end:
+        shape = None
+        shape_t_start += 2500
+
+def draw():
+    global time, shape_t_start
+    
+    center_x, center_y = pixi.screen_center()
+    w, h = pixi.screen_dimensions()
+    
+    # Draw all stars with size based on depth
+    for star in stars:
+        # Project 3D position to 2D screen
+        factor = 200 / star.z
+        screen_x = center_x + star.x * factor
+        screen_y = center_y + star.y * factor
+        
+        # Calculate size and brightness based on depth
+        size = max(0.5, 3 * (1 - star.z / 1000))
+        brightness = int(255 * (1 - star.z / 1000))
+        color = f'rgb({brightness},{brightness},{brightness})'
+        
+        # Draw star as a small filled circle
+        if 0 <= screen_x <= w and 0 <= screen_y <= h:
+            pixi.draw_circle(screen_x, screen_y, size, color, filled=True)
+
+    fontsize = ((w * 0.9) / 9) * 2.0
+    tx, ty = center_x, center_y - 0.1 * h
+
+    if transitions_ms[0] <= time < transitions_ms[1]:
+        # Want to get this to nearly fill the width
+        pixi.draw_text('STARFIELD', tx, ty, 
+                       'white', font_size=fontsize, 
+                       font_family='Arial Narrow', bold=True)
+    elif transitions_ms[1] <= time < transitions_ms[2]:
+        mag = ((time - transitions_ms[1]) / 1000) * 2
+        tx += (2*random.random() - 1) * mag
+        ty += (2*random.random() - 1) * mag
+        pixi.draw_text('STARFIELD', tx, ty, 
+                       'white', font_size=fontsize + mag*3.5, 
+                       font_family='Arial Narrow', bold=True)
+
+    if shape:
+        mag = ((time - shape_t_start) / 1000) * 2
+        tx = (2*random.random() - 1) * mag
+        ty = (2*random.random() - 1) * mag
+        pixi.draw_circle(shape.x + tx, shape.y + ty, shape.r + mag * 1.75, 
+                         filled=shape.fill_color, 
+                         color=shape.line_color, width=3)
+    
+# Run the demo
+pixi.run(update, draw, 'black', 800, 600)
+</script>
+</body>
+</html>
