@@ -52,6 +52,7 @@ See the live version [here](https://robotfantastic.org/pywebedit/).
   - Or consider Phaser.js
   - https://buzz.jaysalvat.com/ for audio
 - https://ggame.readthedocs.io/en/latest/introduction.html
+- https://waelyasmina.net/articles/pixi-js-tutorial-for-complete-beginners/
 - Add autosave?
 - Fix bug: If example fails to load, incorrectly states that it wasn't
   encoded by pywebedit
