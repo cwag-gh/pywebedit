@@ -41,11 +41,11 @@ See the live version [here](https://robotfantastic.org/pywebedit/).
 
 ## TODO
 
-- Add examples as tutorials
-  - Variations on input
+- Save scroll and cursor location when switching modules, saving.
+- Fix issue where mismatched tags in the body section will screw up
+  code generation. Need to parse it?
 - Fix behavior with long lines - editor grows, which may not be what
   we want
-- Add ability to have multiple python files
 - Add all examples from Brython website?
 - Add examples using pixi.js (fast 2d rendering engine, basis for
   Phaser.js)
@@ -54,14 +54,11 @@ See the live version [here](https://robotfantastic.org/pywebedit/).
 - https://ggame.readthedocs.io/en/latest/introduction.html
 - https://waelyasmina.net/articles/pixi-js-tutorial-for-complete-beginners/
 - Add autosave?
-- Fix bug: If example fails to load, incorrectly states that it wasn't
-  encoded by pywebedit
 - Add [indentation markers](https://github.com/replit/codemirror-indentation-markers)
 - Don't add the stdlib if the python doesn't require it
 - Consider using brython's browser.widgets.menu to make more complex
   menu interfaces
-- Fix issue where mismatched tags in the body section will screw up
-  code generation. Need to parse it?
+
 
 New example order:
 - hello
