@@ -1,0 +1,369 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython.min.js"></script>
+<script> typeof brython === "undefined" && document.write('<script src="brython.min.js">\x3C/script>')</script>
+
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython_stdlib.js"></script>
+<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write('<script src="brython_stdlib.js">\x3C/script>')</script>
+
+
+<script type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+}
+</script>
+</head>
+
+<body onload="__brython_pre_then_code()">
+<div align="center">
+<canvas id="canvas" 
+        width="2400" 
+        height="1200"></canvas>
+</div>
+<h1 id='text'></h1>
+
+<script type="text/python" id="brythonpre">
+from browser import document, window
+
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\n" + msg)
+sys.stderr = __ErrorReporter()
+
+# Load modules - use runPythonSource as it is synchronous
+for module in ['__pwe_Vec2', '__pwe_Mouse', '__pwe_drawing']:
+    __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
+
+# Now run main code
+window.brython({'debug': 1, 'ids': ["pythoncode"]})
+</script>
+
+<script type="text/python" id="__pwe_Vec2">
+import math
+from browser import document, window, aio
+
+
+class Vec2:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+    
+    def norm(self):
+        return math.sqrt(self.x**2 + self.y**2)
+    
+    def normalize(self):
+        n = self.norm()
+        if n != 0:
+            return Vec2(self.x/n, self.y/n)
+        raise ZeroDivisionError("vector has length zero")
+
+    def rot90(self):
+        return Vec2(self.y, -self.x)
+    
+    def rot270(self):
+        vec = self
+        for i in range(0, 2):
+            vec = vec.rot90()
+            
+    def __repr__(self):
+        return f"Vec2({self.x}, {self.y})"
+
+    def __eq__(self, vec):
+        return self.x == vec.x and self.y == vec.y
+            
+    def __add__(self, vec):
+        if isinstance(vec, Vec2):
+            return Vec2(self.x + vec.x, self.y + vec.y)
+        return Vec2(self.x + vec, self.y + vec)
+    
+    def __radd__(self, n):
+        return Vec2(self.x + n, self.y + n)
+    
+    def __sub__(self, vec):
+        if isinstance(vec, Vec2):
+            return Vec2(self.x - vec.x, self.y - vec.y)
+        return Vec2(self.x - vec, self.y - vec)
+    
+    def __mul__(self, n):
+        if isinstance(n, Vec2):
+            raise ValueError("no vector to vector multiplication")
+        return Vec2(self.x*n, self.y*n)
+    
+    def __rmul__(self, n):
+        return self*n
+    
+    def __truediv__(self, n):
+        return Vec2(self.x/n, self.y/n)
+    
+    def __getitem__(self, idx):
+        vec = [self.x, self.y]
+        if idx > 1 or idx < -2:
+            raise IndexError("vector only has two dimensions")
+        return vec[idx]
+    
+    def __setitem__(self, idx, val):
+        if idx > 1 or idx < -2:
+            raise IndexError("vector only has two dimensions")
+        if idx == -2:
+            self.x = val
+        elif idx == -1:
+            self.y = val
+        elif idx == 0:
+            self.x = val
+        elif idx == 1:
+            self.y = val
+
+
+            
+
+</script>
+
+<script type="text/python" id="__pwe_Mouse">
+class Mouse:
+    def __init__(self, canvas):
+        self.canvas = canvas
+        self.ldown = False
+        self.rdown = False
+        self.pos = [0, 0]
+        self.canvas.bind("mousedown", self.onmousedown)
+        self.canvas.bind("mouseup", self.onmouseup)
+        self.canvas.bind("mousemove", self.onmousemove)
+    
+    def onmousedown(self, event):
+        if event.button == 0:
+            self.ldown = True
+        elif event.button == 1:
+            self.rdown = True
+        self.getpos(event)
+        
+    def onmouseup(self, event):
+        if event.button == 0:
+            self.ldown = False
+        elif event.button == 1:
+            self.rdown = False
+        self.getpos(event)
+        
+    def onmousemove(self, event):
+        self.getpos(event)
+     
+    def getpos(self, event):
+        rect = self.canvas.getBoundingClientRect()
+        self.pos[0] = event.clientX - rect.left
+        self.pos[1] = event.clientY - rect.top
+</script>
+
+<script type="text/python" id="__pwe_drawing">
+import math
+from browser import console
+
+class Drawing:
+    def __init__(self, CTX):
+        self.CTX = CTX
+
+        
+    def draw_circle(self, x, y, radius, color='black', filled=False, width=1):
+        "Draw a circle at (x,y) with given radius"
+        self.CTX.beginPath()
+        self.CTX.arc(x, y, radius, 0, math.pi * 2)
+        if (filled):
+            self.CTX.fillStyle = color
+            self.CTX.fill()
+        else:
+            self.CTX.strokeStyle = color
+            self.CTX.lineWidth = width
+            self.CTX.stroke()
+        
+        
+    def drawRectangle(self, x, y, width, height, color):
+        self.CTX.fillStyle = color
+        self.CTX.fillRect(
+            round(x),
+            round(y),
+            round(width),
+            round(height)) 
+    
+
+    def draw_line(self, x1, y1, x2, y2, color='black', width=1):
+        "Draw a line from (x1,y1) to (x2,y2)"
+        self.CTX.strokeStyle = color
+        self.CTX.lineWidth = width
+        self.CTX.beginPath()
+        self.CTX.moveTo(x1, y1)
+        self.CTX.lineTo(x2, y2)
+        self.CTX.stroke()
+        
+    def draw_spring(self, pos1, pos2, peaks, color = "black", width = 1, springwidth = 10):
+        positions = []
+        diff = pos2 - pos1
+        for i in range(peaks+1):
+            if i%2 == 0:
+                pos = pos1 + ((diff/peaks)*i) + ((diff.normalize()*springwidth)).rot90()
+            else:
+                pos = pos1 + ((diff/peaks)*i) - ((diff.normalize()*springwidth)).rot90()
+            positions.append(pos)
+        for i in range(len(positions)-1):
+            pos = positions[i]
+            pos_2 = positions[i+1]
+            console.log(f"{pos == pos1}")
+            console.log(f"{pos_2 == pos1}")
+            self.draw_line(pos.x, pos.y, pos_2.x, pos_2.y, color, width)
+        positions = []
+        for i in range(peaks+1):
+            if i%2 == 0:
+                pos = pos1 + ((diff/peaks)*i) - ((diff.normalize()*springwidth)).rot90()
+            else:
+                pos = pos1 + ((diff/peaks)*i) + ((diff.normalize()*springwidth)).rot90()
+            positions.append(pos)
+        for i in range(len(positions)-1):
+            pos = positions[i]
+            pos_2 = positions[i+1]
+            console.log(f"{pos == pos1}")
+            console.log(f"{pos_2 == pos1}")
+            self.draw_line(pos.x, pos.y, pos_2.x, pos_2.y, color, width)
+            
+            
+</script>
+
+<script type="text/python" id="pythoncode">
+from Vec2 import Vec2
+from Mouse import Mouse
+from drawing import Drawing
+import math
+import random
+from browser import document, window, aio, console
+
+canvas = document.getElementById("canvas")
+CTX = document['canvas'].getContext('2d')
+WD = document['canvas'].width
+HT = document['canvas'].height
+
+Draw = Drawing(CTX)
+
+Mouse = Mouse(canvas)
+
+p = [Vec2(200, 300),
+     Vec2(780, 300),
+     Vec2(500, 800),
+    Vec2(800, 800)]
+v = [Vec2(4, 5),
+     Vec2(3, 0.1),
+     Vec2(15, 20),
+     Vec2(3, 0.1)]
+xel = [Vec2(0, 0),
+       Vec2(0, 0),
+       Vec2(0, 0),
+      Vec2(0, 0)]
+k = 0.0003
+m = 2
+wanted = 500
+prevmousedown = False
+hex = {0:'0',
+       1:'1',
+       2:'2',
+       3:'3',
+       4:'4',
+       5:'5',
+       6:'6',
+       7:'7',
+       8:'8',
+       9:'9',
+       10:'a',
+       11:'b',
+       12:'c',
+       13:'d',
+       14:'e',
+       15:'f'
+        }
+
+def random_colour():
+    R = hex[random.randint(0, 15)]
+    G = hex[random.randint(0, 15)]
+    B = hex[random.randint(0, 15)]
+    return '#' + R + G + B
+
+colours = [random_colour(),
+           random_colour(),
+           random_colour(),
+           random_colour()]
+    
+def collide_circle(x, y, x2, y2, r):
+    norm = Vec2(x2-x, y2-y).norm()
+    return norm <= r
+
+def update(e):
+    global p, v, xel, k, m, wanted, center, prevmousedown
+    center = Vec2(0, 0)
+    for pos in p:
+        center += pos/len(p)
+    xelchange = Vec2((WD/2)-center.x, (HT/2)-center.y)*k/10
+    lists = []
+    for ia, pos_a in enumerate(p):
+        sortlist = []
+        vectlist = []
+        for ib, pos_b in enumerate(p):
+            if ia == ib:
+                continue
+            sortlist.append((ib, (pos_b-pos_a).norm()))
+            vectlist.append(pos_b-pos_a)
+        sortedlist = sorted(sortlist, key = lambda i: i[1])
+        lowi = sortedlist.pop(0)[0] - 1
+        low2i = sortedlist.pop(0)[0] - 1
+        console.log(vectlist[0].x)
+        lists.append([vectlist[lowi], vectlist[low2i]])
+    for a, pos in enumerate(p):
+        for ib, b in enumerate(lists[a]):
+            if pos == b:
+                continue
+            sidewanted = 2*wanted*math.sin(math.pi/len(p))
+            wantedvect = b.normalize()*sidewanted
+            xel[a] += (b-wantedvect)*k/m*0.7
+        wantedvect = (center-pos).normalize()*wanted
+        xel[a] += ((center-pos)-wantedvect)*k/m
+        xel[a] += xelchange
+        console.log(xel[a].x)
+        console.log(xel[a].y)
+    for a, i in enumerate(v):
+        v[a] += xel[a]
+        v[a] *= 0.7
+    for a, i in enumerate(p):
+        p[a] += v[a]
+        #p[a] += poschange
+
+    if (not prevmousedown) and Mouse.ldown:
+        prevmousedown = True
+        p.append(Vec2(Mouse.pos[0], Mouse.pos[1]))
+        v.append(Vec2(0, 0))
+        xel.append(Vec2(0, 0))
+        colours.append(random_colour())
+    if not Mouse.ldown:
+        prevmousedown = False
+        
+
+    draw()
+
+    window.requestAnimationFrame(update)
+
+def draw():
+    Draw.drawRectangle(0, 0, canvas.width, canvas.height, "#fff")
+    for ia, pos in enumerate(p):
+        for ib, pos_a in enumerate(p):
+            if ib <= ia:
+                continue
+            Draw.draw_spring(pos, pos_a, 20, "black", 2, 9)
+        Draw.draw_circle(pos.x, pos.y, 10, colours[ia], True, 1)
+    Draw.draw_line(center.x, center.y, WD/2, HT/2, "black", 5)
+            
+
+update(3)
+</script>
+</body>
+</html>
