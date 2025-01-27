@@ -5,10 +5,14 @@
   <meta charset="utf-8">
   <title>&lt;pywebedit&gt; Code python in the browser, even offline</title>
 
-  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython.min.js"> </script>
-  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython_stdlib.js"> </script>
+  <!-- Use latest versions of brython -->
+  <script src="https://raw.githack.com/brython-dev/brython/master/www/src/brython.js" crossorigin="anonymous"> </script>
+  <script>typeof brython === "undefined" && document.write('<script src="brython.js">\x3C/script>')</script>
 
-  <script type="text/javascript" src="editor.bundle.min.js"></script>
+  <script src="https://raw.githack.com/brython-dev/brython/master/www/src/brython_stdlib.js" crossorigin="anonymous"> </script>
+  <script>typeof __BRYTHON__.use_VFS === "undefined" && document.write('<script src="brython_stdlib.js">\x3C/script>')</script>
+
+  <script type="text/javascript" src="pywebeditor.min.js"></script>
 
   <!-- Simple styling to get the tight layout we want. -->
   <style>
@@ -20,7 +24,9 @@
       .toolbar { height: 20px;
                  align-items: flex-end;
                  padding-bottom: 2px; }
-      .help    { justify-content: flex-end; }
+      .help    { justify-content: space-between; }
+      .toolbar-right { display: flex;
+                       gap: 6px; }
       .content { height: calc(100vh - 20px - 4px - 4px - 2px);
                  overflow-y: scroll; }
       .mainbtn { font-weight: bold; }
@@ -50,22 +56,24 @@
 
     <div class="column">
       <div class="row toolbar help">
-        <select name="examples" id="examples"> </select>
-        <button id="btnhelp"> Help </button>
+        <select name="pyfiles" id="pyfiles"> </select>
+        <div class="toolbar-right">
+          <select name="examples" id="examples"> </select>
+          <button id="btnhelp"> Help </button>
+        </div>
       </div>
       <div class="content" id="python_editor">
       </div>
     </div>
   </div>
 
-<script type="text/python">
-# Main python code
+<script type="text/python"># Main python code
 
 from browser import document, window, bind, aio, console, html
-from browser.widgets.dialog import InfoDialog, Dialog
-
+from browser.widgets.dialog import InfoDialog, Dialog, EntryDialog
 
 BRYTHON_VERSION = '3.13.0'
+PYWEBEDIT_VERSION = '0.2.0'
 
 
 INITIAL_HTML = """
@@ -82,7 +90,14 @@ document['text'].textContent='Hello, World!'
 
 
 HELP = f"""
-<h2 class="title">pywebedit</h2>
+<div>
+  <h3>&ltpywebedit&gt</h3>
+  <p>In-browser python editing and running, allowing creation of
+     standalone webpages that use python. </p>
+  <p>Download the standalone version
+     <a href="https://robotfantastic.org/pywebedit/pywebedit.zip">here</a>.
+     Just unzip, then open pywebedit.html in your browser.</p>
+</div>
 <div>
   Keys:
   <ul>
@@ -97,25 +112,30 @@ HELP = f"""
 <div>
   Links:
   <ul>
+    <li><a href="https://robotfantastic.org/pywebedit/pywebedit.zip">pywebedit offline distribution</a> (v{PYWEBEDIT_VERSION})</li>
     <li><a href="https://github.com/cwag-gh/pywebedit/">pywebedit source</a></li>
     <li><a href="https://www.brython.info/">Brython</a> (using v{BRYTHON_VERSION})</li>
     <li><a href="https://www.python.org/">Python</a></li>
     <li><a href="https://codemirror.net/">Codemirror</a> editor component (v6)</li>
   </ul>
 </div>
-"""
+""".strip()
 
-# Template for generated final page. Do not include script
-# tags, which screws up the html in python in html. Use
-# alternate replacement syntax (other than format()) to
-# avoid syntax conflicts.
+# Template for generated final page. Do not include script tags, which
+# screws up the html in python in html. Use alternate replacement
+# syntax (other than format()) to avoid syntax conflicts. Note the
+# second level of indirection when defining the fallback script tags.
 PAGE_TEMPLATE = """
 <!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
-%script% type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@%brython_version%/brython.min.js">%endscript%
-%script% type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@%brython_version%/brython_stdlib.js">%endscript%
+%script% type="text/javascript" src="https://raw.githack.com/brython-dev/brython/master/www/src/brython.js" crossorigin="anonymous">%endscript%
+%script%> typeof brython === "undefined" && document.write('%script% src="brython.js">\\x3C/script>')%endscript%
+
+%script% type="text/javascript" src="https://raw.githack.com/brython-dev/brython/master/www/src/brython_stdlib.js" crossorigin="anonymous">%endscript%
+%script%> typeof __BRYTHON__.use_VFS === "undefined" && document.write('<script src="brython_stdlib.js">\x3C/script>')%endscript%
+
 
 %script% type="text/javascript">
 function __brython_pre_then_code() {
@@ -126,7 +146,6 @@ function __brython_pre_then_code() {
 
 <body onload="__brython_pre_then_code()">
 %html_body%
-
 %script% type="text/python" id="brythonpre">
 from browser import document, window
 
@@ -142,340 +161,556 @@ class __ErrorReporter:
         self.errdiv.textContent += ("\\n" + msg)
 sys.stderr = __ErrorReporter()
 
+# Load modules - use runPythonSource as it is synchronous
+for module in [%modules%]:
+    __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
+
+# Now run main code
 window.brython({'debug': 1, 'ids': ["pythoncode"]})
 %endscript%
+
+%modulescripts%
 
 %script% type="text/python" id="pythoncode">
 %python_code%
 %endscript%
 </body>
 </html>
-"""
+""".strip()
+
+MODULE_TEMPLATE = """
+%script% type="text/python" id="%moduleid%">
+%modulecode%
+%endscript%
+""".strip()
 
 EXAMPLES = {
+    "Getting started": [
+        ("hello",       "1) Hello world"),
+        ("input0",      "2) Basic input"),
+        ("basic_html",  "3) Initial HTML"),
+        ("error",       "4) Showing python errors"),
+        ("styled_html", "5) Styled HTML"),
+        ("bind",        "6) Run python based on events"),
+        ("modules",     "7) Organizing code into modules"),
+        ("console",     "8) Simple control flow with async"),
+    ],
     "Interacting with HTML": [
-        ("hello", "Hello world"),
         ("calculator", "Calculator with styled buttons"),
         ("sort_table", "Table with sortable columns"),
+        ("sphere", "Decode messages from Sphere"),
     ],
     "Drawing and animating": [
         ("clock", "Analog clock"),
         ("barcode", "Generate barcodes"),
         ("pythagoras", "Animated geometry proof"),
         ("pixelperfect", "Perfect pixel-aligned drawing"),
+        ("springs", "Spring animation with vectors"),
     ],
     "Using javascript libraries": [
-        ("three", "three.js (3D animation), basic example"),
+        ("pixi", "Fast 2D graphics (pixi.js)"),
+        ("pixi2", "Starfield with wrapped pixi.js"),
+        ("three", "3D spinning cube (three.js)"),
     ],
-    "Games": [
+    "Games and interaction": [
         ("breakout", "Brick breaking"),
         ("lightcycles", "Lightcycles"),
     ],
 }
 
-
-# Main state variables
-html_editor = window.EditorView(
-    {'parent': document['html_editor'],
-     'extensions': [window.basicSetup,
-                    window.html(),
-                    window.indentUnit.of("    "),
-                    window.keymap.of([window.indentWithTab])]})
-python_editor = window.EditorView(
-    {'parent': document['python_editor'],
-     'extensions': [window.basicSetup,
-                    window.python(),
-                    window.indentUnit.of("    "),
-                    window.keymap.of([window.indentWithTab])]})
-
-app_window = None
-file_handle = None
-file_name = None
-orig_code = INITIAL_PYTHON
-orig_body = INITIAL_HTML
+PYFILES = [('main', 'main'),
+           (None, None),
+           ('New python module', '__new'),
+           ('Import existing module', '__import'),
+           (None, None),
+           ('Export this python module', '__export'),
+           ('Rename this python module', '__rename'),
+           ('Remove this python module', '__remove')]
 
 
-def editor_contents_set(editor, code):
-    editor.dispatch({'changes': {'from': 0,
-                                 'to': editor.state.doc.length,
-                                 'insert': code}})
-
-
-def editor_contents_get(editor):
-    return editor.state.doc.toString()
-
-
-def add_examples():
-    select = document["examples"]
-
-    # Create and add a default option
-    default_option = html.OPTION("Load example...")
-    default_option.attrs["value"] = ""
-    select <= default_option
-
-    # Iterate through the example groups
-    for group_name, examples in EXAMPLES.items():
-        # Create optgroup
-        group = html.OPTGROUP()
-        group.attrs["label"] = group_name
-
-        # Add options to the group
-        for value, display_text in examples:
-            option = html.OPTION(display_text)
-            option.attrs["value"] = value
-            group <= option
-
-        # Add the group to the select
-        select <= group
-
-
-async def load_example(name):
-    try:
-        relative_url = f'./examples/{name}.html'
-        request = await aio.get(relative_url, format='text')
-        if request.status == 200 or request.status == 0:
-            # TODO: check overwrite of modified data
-            if load_html(request.data):
-                set_loaded_file_and_title(None, f'{name}.html')
-                return
-        else:
-            raise RuntimeError(f"HTTP error: status {request.status}")
-    except Exception as e:
-        console.log(str(e))
-        # TODO: Fallback to choosing folder to load local example
-        d = InfoDialog("Unfortunately...",
-                       f"Unable to load {relative_url} from the server.",
-                       ok="Ok")
-    # For all unsuccessful cases, set the combo box back to default
-    document["examples"].value = ''
-
-
-@bind(document['examples'], 'change')
-def on_example_select(evt):
-    if anything_modified():
-        d = Dialog("Warning...", ok_cancel=('Proceed', 'Cancel'))
-        style = dict(textAlign="center", paddingBottom="1em")
-        d.panel <= html.DIV("Code changes will be lost. Proceed anyway? Or "
-                            "cancel (so you can then save first)?")
-
-        @bind(d.ok_button, "click")
-        def ok(_):
-            aio.run(load_example(evt.target.value))
-            d.close()
+def add_option(select, title, value):
+    if title is None:
+        select <= html.HR()
     else:
-        aio.run(load_example(evt.target.value))
+        option = html.OPTION(title)
+        option.attrs['value'] = value
+        select <= option
 
 
-@bind(document['btnhelp'], 'click')
-def on_help(_):
-    d = InfoDialog("Help", HELP, ok="Ok")
+class UI:
+    PICKER_ID = 'choosefile'
 
+    def __init__(self, app):
+        self.app = app
+        self.app_window = None
+        self.html_editor = window.EditorView(
+            {'parent': document['html_editor'],
+             'extensions': [window.basicSetup,
+                            window.html(),
+                            window.indentUnit.of('    '),
+                            window.keymap.of([window.indentWithTab])]})
+        self.python_editor = window.EditorView(
+            {'parent': document['python_editor'],
+             'extensions': [window.basicSetup,
+                            window.python(),
+                            window.indentUnit.of('    '),
+                            window.keymap.of([window.indentWithTab])]})
 
-def replace_all_tabs():
-    """Replaces all tabs with spaces in the python editor."""
-    editor_contents_set(python_editor, editor_contents_get(python_editor).replace('\t', '    '))
+        self._init_examples()
+        self._init_pyfiles()
 
+        # Set up the events
+        document['btnrun'].bind('click', self.on_run)
+        document['btnopen'].bind('click', self.on_open_precheck)
+        document['btnsave'].bind('click', lambda e: aio.run(self.on_save()))
+        document['btnsaveas'].bind('click', lambda e: aio.run(self.on_save_as()))
+        document['examples'].bind('change', self.on_example_select)
+        document['pyfiles'].bind('change', self.on_pyfiles_select)
+        document['btnhelp'].bind('click', self.on_help)
+        window.addEventListener('beforeunload', self._close_app_window)
 
-@bind(document['btnrun'], 'click')
-def on_run(_):
-    global app_window
-    try:
-        if app_window:
-            app_window.close()
-    except:
-        # Weird error in Chrome when someone reloads the generated tab,
-        # and we then can't access it
-        pass
-    replace_all_tabs()
-    app_window = window.open()
-    app_window.document.write(build_html())
-    app_window.document.close()
+    def _close_app_window(self, evt):
+        return self.app_window.close() if self.app_window else None
 
-    # Download to a file - user has to click on it, but works
-    # blob = window.Blob.new([build_html()], {'type': 'text/html' })
-    # a = document.createElement('a')
-    # a.href = window.URL.createObjectURL(blob)
-    # a.download = 'generated.html'
-    # a.click()
+    def _init_examples(self):
+        select = document['examples']
+        add_option(select, 'Load example...', '')
+        for group_name, examples in EXAMPLES.items():
+            group = html.OPTGROUP()
+            group.attrs['label'] = group_name
+            for value, display_text in examples:
+                add_option(group, display_text, value)
+            select <= group
 
+    def _init_pyfiles(self):
+        select = document['pyfiles']
+        for title, value in PYFILES[:-1]:
+            add_option(select, title, value)
 
-@bind(document['btnopen'], 'click')
-def on_open(_):
-    # Need this intermediate to run async functions
-    aio.run(open_file())
+    def on_run(self, evt):
+        try:
+            if self.app_window:
+                self.app_window.close()
+        except:
+            # Weird error in Chrome when someone reloads the generated tab,
+            # and we then can't access it
+            pass
+        self.app_window = window.open()
+        self.app_window.document.write(self.app.build_html(self.contents_html(),
+                                                           self.contents_python()))
+        self.app_window.document.close()
 
+        # Download to a file - user has to click on it, but works
+        # blob = window.Blob.new([build_html()], {'type': 'text/html' })
+        # a = document.createElement('a')
+        # a.href = window.URL.createObjectURL(blob)
+        # a.download = 'generated.html'
+        # a.click()
 
-async def pick_file_for_saving():
-    return await _pick_file(True)
+    def on_open_precheck(self, evt):
+        self.warn_if_modified(onok=self.on_open())
 
-
-async def pick_existing_file():
-    return await _pick_file(False)
-
-
-async def _pick_file(for_saving):
-    global file_handle, file_name
-    try:
-        if for_saving:
-            name = 'myprogram.html'
-            if file_name is not None:
-                name = file_name
-            handle = await window.showSaveFilePicker({
-               'id': 'choosefile', # Use same id between pickers to save folder
-               'suggestedName': name,
-               'types': [{'description': 'Text documents',
-                          'accept': {'text/html': ['.html']}}]})
-            # TODO: check for success
-            file_handle = handle
-            file_name = file_handle.name
-            return True
-        else:
+    async def _pick_file_to_open(self):
+        try:
             file_handles = await window.showOpenFilePicker({
-               'id': 'choosefile'}) # Use same id between pickers to save folder
-            if len(file_handles) > 0:
-                file_handle = file_handles[0]
-                file_name = file_handle.name
-                return True
-    except AttributeError:
-        # TODO: should be able to handle local saving using download to a file approach
-        d = InfoDialog("Unfortunately...",
-                       "This browser does not support opening and saving local files. Try Chrome.",
-                       ok="Ok")
-    return False
+                'id': self.PICKER_ID}) # Use same id between pickers to save folder
+            if len(file_handles) == 0:
+                return None
+        except AttributeError:
+            self.erropen()
+            return None
+        return file_handles[0]
 
-
-def set_loaded_file_and_title(handle=None, title=None):
-    """Single function to set what has been loaded - a file or an example"""
-    global file_handle, file_name
-    file_handle = handle
-    file_name = title
-    if file_name is None:
+    async def on_open(self):
+        """Pick a file, then load it."""
+        file_handle = await self._pick_file_to_open()
         if file_handle is None:
-            # Reset
-            file_name = ''
-        else:
-            file_name = file_handle.name
-    # Set the UI of the title
-    document.getElementById('filename').innerHTML = f'&lt;pywebedit&gt; {file_name}'
-    document.title = f'<pywebedit> {file_name}'
-
-
-async def open_file():
-    """Pick a file, then load it."""
-    global file_handle
-    success = await pick_existing_file()
-    if not success:
-        return
-    f = await file_handle.getFile()
-    contents = await f.text()
-    load_html(contents)
-    console.log(f'Opened {file_handle.name}.')
-    set_loaded_file_and_title(file_handle, file_handle.name)
-
-
-def load_html(contents):
-    """Update the UI given the actual html contents as a string."""
-    global orig_body, orig_code
-    try:
-        body, script = split_html(contents)
-    except Exception as e:
-        console.log(e)
-        d = InfoDialog("Error",
-                       "Looks like this file was not saved by pywebedit. Unable to load.",
-                       ok="Ok")
-        return False
-    editor_contents_set(html_editor, body)
-    editor_contents_set(python_editor, script)
-    # Save copies so we can detect when edited
-    orig_body = body
-    orig_code = script
-    console.log(f'Set body {len(body)} chars, python {len(script)} chars.')
-    return True
-
-
-def anything_modified():
-    return not(orig_body == editor_contents_get(html_editor) and
-               orig_code == editor_contents_get(python_editor))
-
-
-def split_html(contents):
-    """Split out header, python script out of saved html."""
-    body_and_script = contents.split('<body onload="__brython_pre_then_code()">')[1]
-    body = body_and_script.split('<' + 'script type="text/python" id="brythonpre">')[0].strip()
-    script_and_foot = body_and_script.split('<' + 'script type="text/python" id="pythoncode">')[1]
-    script = script_and_foot.split('<' + '/script>')[0].strip()
-    return body, script
-
-
-def build_html():
-    """Build the full html text, inserting the user editable sections into the template."""
-    tagmap = {'brython_version': BRYTHON_VERSION,
-              'html_body':       editor_contents_get(html_editor),
-              'python_code':     editor_contents_get(python_editor),
-              'script':          '<' + 'script',
-              'endscript':       '<' + '/script>'}
-    p = PAGE_TEMPLATE
-    for key, value in tagmap.items():
-        p = p.replace('%' + key + '%', value)
-    return p
-
-
-# def save_data_to_file(data, filename, type):
-#     blob = window.Blob
-#     file = blob.new([data], {'type': type})
-#     if window.navigator.msSaveOrOpenBlob: # IE10+
-#         window.navigator.msSaveOrOpenBlob(file, filename)
-#     else: # Others
-#         a = document.createElement('a')
-#         url = window.URL.createObjectURL(file)
-#         a.href = url
-#         a.download = filename
-#         document.body.appendChild(a)
-#         a.click()
-#         def remove_url():
-#             document.body.removeChild(a)
-#             window.URL.revokeObjectURL(url)
-#         window.setTimeout(remove_url, 0)
-
-
-async def write_file(contents):
-    global file_handle
-    assert file_handle is not None
-    writable = await file_handle.createWritable()
-    await writable.write(contents)
-    await writable.close()
-
-
-@bind(document['btnsave'], 'click')
-def on_save(_):
-    replace_all_tabs()
-    aio.run(save_file(False))
-
-
-@bind(document['btnsaveas'], 'click')
-def on_save_as(_):
-    replace_all_tabs()
-    aio.run(save_file(True))
-
-
-async def save_file(with_picker):
-    global file_handle, file_name
-    if file_handle is None or with_picker:
-        success = await pick_file_for_saving()
-        if not success:
             return
-    # A bit lame - this re-sets what is already there just to update the UI
-    set_loaded_file_and_title(file_handle, file_name)
-    await write_file(build_html())
+        await self.app.open_file(file_handle)
+
+    async def on_save(self, force_picker=False):
+        handle = self.app.file_handle
+        if force_picker or not self.app.has_file():
+            name = 'myprogram.html'
+            if self.app.file_name is not None:
+                name = self.app.file_name
+            try:
+                handle = await window.showSaveFilePicker({
+                   'id': self.PICKER_ID, # Use same id between pickers to save folder
+                   'suggestedName': name,
+                   'types': [{'description': 'Text documents',
+                              'accept': {'text/html': ['.html']}}]})
+            except AttributeError:
+                self.erropen()
+                return
+            except JavascriptError:
+                # User cancelled
+                return
+        await self.app.save_file(handle, self.contents_html(), self.contents_python())
+
+    async def on_save_as(self):
+        await self.on_save(force_picker=True)
+
+    def _check_valid_module_name(self, name, with_existing_check=True):
+        title = 'Invalid module name'
+        if len(name) > 20:
+            self.err('Module names must be no more than 20 letters.', title)
+        elif name.startswith('__'):
+            self.err('Module names must not start with two underscores.', title)
+        elif not name.replace('_', '').isalnum():
+            self.err('Module names must only include letters, numbers, and underscores.', title)
+        elif with_existing_check and name in self.app.modules:
+            self.err('Module name already exists.', title)
+        else:
+            return True
+        return False
+
+    def _check_newname(self, name):
+        if self._check_valid_module_name(name):
+            self.app.new_module(name, self.contents_python())
+
+    def _check_rename(self, name):
+        if self._check_valid_module_name(name):
+            self.app.rename_module(name)
+
+    async def on_import(self):
+        file_handle = await self._pick_file_to_open()
+        if file_handle is None:
+            return
+        module_name = file_handle.name.replace('.py', '')
+        if module_name in self.app.modules:
+            def complete_import(name):
+                if self._check_valid_module_name(name, with_existing_check=False):
+                    aio.run(self.app.import_module(name, file_handle, self.contents_python()))
+
+            self.inputdialog(
+                'Warning...',
+                f'Module "{module_name}" already exists.<br><br>'
+                'Enter a new name, or just keep the same to overwrite the module.<br><br>'
+                'Import module as:',
+                onok=complete_import, value=module_name)
+        else:
+            await self.app.import_module(module_name, file_handle, self.contents_python())
+
+    async def on_export(self):
+        name = f'{self.app.active_module}.py'
+        try:
+            handle = await window.showSaveFilePicker({
+               'id': self.PICKER_ID, # Use same id between pickers to save folder
+               'suggestedName': name,
+               'types': [{'description': 'Python files',
+                          'accept': {'text/py': ['.py']}}]})
+        except AttributeError:
+            self.erropen()
+            return
+        except JavascriptError:
+            # User cancelled
+            return
+        await self.app.export_module(handle, self.contents_python())
+
+    def on_remove(self):
+        d = Dialog('Warning...', ok_cancel=('Proceed', 'Cancel'))
+        d.panel <= html.DIV(f'Proceed with removing module {self.app.active_module}? '
+                            'Non-exported changes will be lost.')
+
+        @bind(d.ok_button, 'click')
+        def ok(_):
+            d.close()
+            self.app.remove_module()
+
+    def on_pyfiles_select(self, evt):
+        module = evt.target.value
+        if module.startswith('__'):
+            self.set_active_module(self.app.active_module)
+        if module == '__new':
+            self.inputdialog('New module', 'Module name:', self._check_newname)
+        elif module == '__import':
+            aio.run(self.on_import())
+        elif module == '__export':
+            aio.run(self.on_export())
+        elif module == '__rename':
+            if self.app.active_module == 'main':
+                self.err("Can't rename main module.")
+                return
+            self.inputdialog('Rename module', 'New name', self._check_rename)
+        elif module == '__remove':
+            self.on_remove()
+        else:
+            self.app.select_module(module, self.contents_python())
+
+    def on_example_select(self, evt):
+        # Since we really use this as a menu, automatically return to first choice.
+        # Don't want to have to deal with situation where an example has been
+        # modified - do we change the example choice or not?
+        self.warn_if_modified(onok=self.app.load_example(evt.target.value))
+        self.set_example_choice('')
+
+    def on_help(self, evt):
+        self.msg('Help', HELP, top=100, left=200)
+
+    def warn_if_modified(self, onok):
+        if self.app.anything_modified(self.contents_html(), self.contents_python()):
+            d = Dialog('Warning...', ok_cancel=('Proceed', 'Cancel'))
+            d.panel <= html.DIV('Code changes will be lost. Proceed anyway? '
+                                'Or, cancel (so you can then save first)?')
+
+            @bind(d.ok_button, 'click')
+            def ok(_):
+                aio.run(onok)
+                d.close()
+        else:
+            aio.run(onok)
+
+    def inputdialog(self, title, prompt, onok, value=None):
+        d = EntryDialog(title, prompt)
+        if value is not None:
+            d.entry.value = value
+
+        @bind(d, 'entry')
+        def entry(ev):
+            value = d.value
+            d.close()
+            if value:
+                onok(value)
+
+    def msg(self, title, text, top=None, left=None):
+        d = InfoDialog(title, text, ok='Ok', top=top, left=left)
+
+    def err(self, text, title='Unfortunately...'):
+        self.msg(title, text)
+
+    def erropen(self):
+        self.err('This browser does not support opening and saving local files. Try Chrome.')
+
+    def contents_html(self):
+        return self.html_editor.state.doc.toString()
+
+    def contents_python(self):
+        return self.python_editor.state.doc.toString().replace('\t', '    ')
+
+    def set_loaded_file(self, file_name):
+        document.getElementById('filename').innerHTML = f'&lt;pywebedit&gt; {file_name}'
+        document.title = f'<pywebedit> {file_name}'
+
+    def set_contents_html(self, code):
+        self.html_editor.dispatch({'changes': {'from': 0,
+                                               'to': self.html_editor.state.doc.length,
+                                               'insert': code}})
+
+    def set_contents_python(self, code):
+        self.python_editor.dispatch({'changes': {'from': 0,
+                                                 'to': self.python_editor.state.doc.length,
+                                                 'insert': code}})
+
+    def set_example_choice(self, value):
+        document['examples'].value = value
+
+    def set_active_module(self, module_name):
+        document['pyfiles'].value = module_name
+
+    def set_module_list(self, names):
+        select = document['pyfiles']
+        select.innerHTML = ''  # This clears the selection box
+        for name in names:
+            add_option(select, name, name)
+        # Don't add the remove option if there is only one
+        pyfiles = PYFILES[1:] if len(self.app.modules) > 1 else PYFILES[1:-1]
+        for title, value in pyfiles:
+            add_option(select, title, value)
+
+    def set_focus_python(self):
+        self.python_editor.focus()
 
 
-# Auto close child window if main window is closed
-window.addEventListener('beforeunload', lambda e: app_window.close() if app_window else None)
+class App:
+    def __init__(self):
+        self.file_handle = None
+        self.file_name = None # Save file name separate
+        self.modules: dict[str, str] = {'main': INITIAL_PYTHON}
+        self.active_module = 'main'
+        self.orig_modules = dict(self.modules)
+        self.orig_body = INITIAL_HTML
 
-add_examples()
-editor_contents_set(html_editor, INITIAL_HTML)
-editor_contents_set(python_editor, INITIAL_PYTHON)
+        self.ui = UI(self)
 
+        self.ui.set_contents_html(self.orig_body)
+        self.update_ui(update_python_text=True)
+
+    def anything_modified(self, current_body, current_python):
+        self.modules[self.active_module] = current_python
+        return ((current_body != self.orig_body) or
+                (set(self.orig_modules.keys()) != set(self.modules.keys())) or
+                any(self.orig_modules[k] != self.modules[k] for k in self.modules))
+
+    def has_file(self):
+        return self.file_handle != None
+
+    def update_ui(self, update_python_text=False):
+        # Not complete - we don't keep track of active example
+        if self.file_name is not None:
+            self.ui.set_loaded_file(self.file_name)
+        self.ui.set_module_list(self.modules.keys())
+        self.ui.set_active_module(self.active_module)
+        if update_python_text:
+            self.ui.set_contents_python(self.modules[self.active_module])
+            self.ui.set_focus_python()
+
+    async def load_example(self, name):
+        # Assumes overwrite check has already been completed
+        relative_url = f'./examples/{name}.html'
+        try:
+            request = await aio.get(relative_url, format='text')
+            if not(request.status == 200 or request.status == 0):
+                raise RuntimeError(f'HTTP error: status {request.status}')
+            if not request.data:
+                raise RuntimeError(f'Empty request data')
+            if self.load_html(request.data):
+                self.file_handle = None
+                self.file_name = f'{name}.html'
+                self.ui.set_loaded_file(f'{name}.html')
+                return
+        except Exception as e:
+            console.log(str(e))
+            self.ui.err(f'Unable to load {relative_url} from the server.')
+
+    async def open_file(self, file_handle):
+        f = await file_handle.getFile()
+        contents = await f.text()
+        if not self.load_html(contents):
+            return
+        # File load successful
+        self.file_handle = file_handle
+        self.file_name = file_handle.name
+        console.log(f'Opened {file_handle.name}.')
+        self.ui.set_loaded_file(self.file_name)
+
+    def load_html(self, contents):
+        try:
+            body, modules = self.split_html(contents)
+        except Exception as e:
+            console.log(e)
+            self.ui.err('Looks like this file was not saved by pywebedit. Unable to load.')
+            return False
+        # Save copies so we can detect when edited
+        self.orig_body = body
+        self.orig_modules = modules
+        # Set up modules and active module
+        self.modules = dict(modules)
+        self.active_module = 'main'
+        # Load successful
+        self.ui.set_contents_html(body)
+        self.update_ui(update_python_text=True)
+        return True
+
+    def split_html(self, contents):
+        """Split out header, python scripts from saved html."""
+        body_and_scripts = contents.split('<body onload="__brython_pre_then_code()">')[1]
+
+        body, skip, *modfragments, script_and_foot = body_and_scripts.split(
+            '<' + 'script type="text/python" id=')
+
+        # Body has extra line - remove it
+        body = '\n'.join(body.splitlines()[1:])
+
+        modules = {}
+        lines = script_and_foot.strip().splitlines()
+        script = '\n'.join(lines[1:-3])
+        modules['main'] = script
+
+        for fragment in modfragments:
+            lines = fragment.splitlines()
+            modname = lines[0].replace('"__pwe_', '').replace('">', '')
+            modules[modname] = '\n'.join(lines[1:-2])
+
+        return body, modules
+
+    def build_html(self, html_body, python_code):
+        """Build the full html text, inserting the user editable sections into the template."""
+        self.modules[self.active_module] = python_code
+        module_texts = []
+        for module_name, module_code in self.modules.items():
+            if module_name == 'main':
+                continue
+            tagmap = {'script':    '<' + 'script',
+                      'endscript': '<' + '/script>',
+                      'modulecode': module_code,
+                      'moduleid': f'__pwe_{module_name}'}
+            m = MODULE_TEMPLATE
+            for key, value in tagmap.items():
+                m = m.replace('%' + key + '%', value)
+            module_texts.append(m)
+
+        tagmap = {'brython_version': BRYTHON_VERSION,
+                  'html_body':       html_body,
+                  'python_code':     self.modules['main'],
+                  'script':          '<' + 'script',
+                  'endscript':       '<' + '/script>',
+                  'modules':         ', '.join(f"'__pwe_{m}'" for m in self.modules if m != 'main'),
+                  'modulescripts':   '\n\n'.join(module_texts)}
+        p = PAGE_TEMPLATE
+        for key, value in tagmap.items():
+            p = p.replace('%' + key + '%', value)
+        return p
+
+    async def save_file(self, file_handle, html_body, python_code):
+        self.modules[self.active_module] = python_code
+        self.file_handle = file_handle
+        self.file_name = file_handle.name
+        full_html = self.build_html(html_body, python_code)
+        writable = await file_handle.createWritable()
+        await writable.write(full_html)
+        await writable.close()
+        console.log(f'Wrote {self.file_name}')
+        self.update_ui(update_python_text=True)
+
+    def new_module(self, name, current_python_code):
+        assert name not in self.modules
+        self.modules[self.active_module] = current_python_code
+        self.active_module = name
+        self.modules[name] = ''
+        self.update_ui(update_python_text=True)
+
+    async def import_module(self, name, file_handle, current_python_code):
+        self.modules[self.active_module] = current_python_code
+        f = await file_handle.getFile()
+        contents = await f.text()
+        self.modules[name] = contents.replace('\t', '    ')
+        self.active_module = name
+        console.log(f'Imported {file_handle.name} as {name}')
+        self.update_ui(update_python_text=True)
+
+    async def export_module(self, file_handle, current_python_code):
+        self.modules[self.active_module] = current_python_code
+        writable = await file_handle.createWritable()
+        await writable.write(current_python_code)
+        await writable.close()
+        console.log(f'Exported module {self.active_module} as {file_handle.name}')
+        self.update_ui(update_python_text=True)
+
+    def rename_module(self, new_name):
+        assert new_name not in self.modules
+        assert self.active_module != 'main'
+        old_name = self.active_module
+        self.modules[new_name] = self.modules[old_name]
+        del self.modules[old_name]
+        self.active_module = new_name
+        console.log(f'Module {old_name} renamed to {new_name}')
+        self.update_ui(update_python_text=False)
+
+    def remove_module(self):
+        assert len(self.modules) > 1
+        del self.modules[self.active_module]
+        self.active_module = 'main'
+        self.update_ui(update_python_text=True)
+
+    def select_module(self, name, current_python_code):
+        assert name in self.modules
+        self.modules[self.active_module] = current_python_code
+        self.active_module = name
+        self.update_ui(update_python_text=True)
+
+
+app = App()
 </script>
 </body>
 </html>

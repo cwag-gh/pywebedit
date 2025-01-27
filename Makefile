@@ -1,7 +1,10 @@
 JS_DEPS = \
-    https://cdn.jsdelivr.net/npm/brython@3.13.0/brython.min.js \
-    https://cdn.jsdelivr.net/npm/brython@3.13.0/brython_stdlib.js \
+    https://raw.githack.com/brython-dev/brython/master/www/src/brython.js \
+    https://raw.githack.com/brython-dev/brython/master/www/src/brython_stblib.js \
     https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.6.6/pixi.min.js
+#    https://cdn.jsdelivr.net/npm/brython@3.13.0/brython.min.js \
+#    https://cdn.jsdelivr.net/npm/brython@3.13.0/brython_stdlib.js \
+
 
 CSS_DEPS = \
     https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css
@@ -46,5 +49,6 @@ dist/%.css:
 dist/pywebedit.zip: pywebedit.html dist/pywebeditor.min.js $(ALL_DIST_FILES)
 	cd dist && zip pywebedit.zip ../pywebedit.html pywebeditor.min.js $(ALL_FILES)
 
-dist: pywebedit.html dist/pywebedit.zip
+dist: pywebedit.html dist/pywebedit.zip dev.html
 	cp pywebedit.html dist/index.html
+	cp dev.html dist/dev.html

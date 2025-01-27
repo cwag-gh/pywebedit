@@ -61,11 +61,11 @@ PAGE_TEMPLATE = """
 <html>
 <head>
 <meta charset="utf-8">
-%script% type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@%brython_version%/brython.min.js">%endscript%
-%script%> typeof brython === "undefined" && document.write('%script% src="brython.min.js">\\x3C/script>')%endscript%
+%script% type="text/javascript" src="https://raw.githack.com/brython-dev/brython/master/www/src/brython.js" crossorigin="anonymous">%endscript%
+%script%> typeof brython === "undefined" && document.write('%script% src="brython.js">\\x3C/script>')%endscript%
 
-%script% type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@%brython_version%/brython_stdlib.js">%endscript%
-%script%> typeof __BRYTHON__.use_VFS === "undefined" && document.write('%script% src="brython_stdlib.js">\\x3C/script>')%endscript%
+%script% type="text/javascript" src="https://raw.githack.com/brython-dev/brython/master/www/src/brython_stdlib.js" crossorigin="anonymous">%endscript%
+%script%> typeof __BRYTHON__.use_VFS === "undefined" && document.write('<script src="brython_stdlib.js">\x3C/script>')%endscript%
 
 
 %script% type="text/javascript">
