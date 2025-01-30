@@ -71,7 +71,7 @@
 from browser import document, window, bind, aio, console, html
 from browser.widgets.dialog import InfoDialog, Dialog, EntryDialog
 
-BRYTHON_VERSION = '3.13.0'
+BRYTHON_VERSION = '3.13.1'
 PYWEBEDIT_VERSION = '0.2.0'
 
 
@@ -134,7 +134,6 @@ PAGE_TEMPLATE = """
 
 %script% type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@%brython_version%/brython_stdlib.js">%endscript%
 %script%> typeof __BRYTHON__.use_VFS === "undefined" && document.write('%script% src="brython_stdlib.js">\\x3C/script>')%endscript%
-
 
 %script% type="text/javascript">
 function __brython_pre_then_code() {

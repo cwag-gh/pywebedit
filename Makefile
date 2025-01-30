@@ -1,9 +1,7 @@
 JS_DEPS = \
-    https://raw.githack.com/brython-dev/brython/master/www/src/brython.js \
-    https://raw.githack.com/brython-dev/brython/master/www/src/brython_stblib.js \
+    https://cdn.jsdelivr.net/npm/brython@3.13.1/brython.min.js \
+    https://cdn.jsdelivr.net/npm/brython@3.13.1/brython_stdlib.js \
     https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.6.6/pixi.min.js
-#    https://cdn.jsdelivr.net/npm/brython@3.13.0/brython.min.js \
-#    https://cdn.jsdelivr.net/npm/brython@3.13.0/brython_stdlib.js \
 
 
 CSS_DEPS = \
