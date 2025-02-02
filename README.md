@@ -50,7 +50,11 @@ See the live version [here](https://robotfantastic.org/pywebedit/).
 - Add examples using pixi.js (fast 2d rendering engine, basis for
   Phaser.js)
   - Or consider Phaser.js
+
+- Sound:
+  - https://tonejs.github.io/
   - https://buzz.jaysalvat.com/ for audio
+  - pixi-sound.js
 - https://ggame.readthedocs.io/en/latest/introduction.html
 - https://waelyasmina.net/articles/pixi-js-tutorial-for-complete-beginners/
 - Add autosave?
@@ -58,14 +62,4 @@ See the live version [here](https://robotfantastic.org/pywebedit/).
 - Don't add the stdlib if the python doesn't require it
 - Consider using brython's browser.widgets.menu to make more complex
   menu interfaces
-
-
-New example order:
-- hello
-- input0 - basic input
-- basic_html - basic html
-- error - Error viewing
-- styled_html
-- bind - Running python based on events
-- modules - Organizing code
-- console - Simple control flow with async
+- Add debugging example to tutorial
