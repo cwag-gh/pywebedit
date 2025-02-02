@@ -1,8 +1,8 @@
 JS_DEPS = \
     https://cdn.jsdelivr.net/npm/brython@3.13.1/brython.min.js \
     https://cdn.jsdelivr.net/npm/brython@3.13.1/brython_stdlib.js \
-    https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.6.6/pixi.min.js
-
+    https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.6.6/pixi.min.js \
+    https://unpkg.com/@pixi/sound@6.0.1/dist/pixi-sound.js
 
 CSS_DEPS = \
     https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css
