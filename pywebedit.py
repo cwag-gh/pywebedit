@@ -469,9 +469,21 @@ class App:
 
     def anything_modified(self, current_body, current_python):
         self.modules[self.active_module] = current_python
-        return ((current_body != self.orig_body) or
-                (set(self.orig_modules.keys()) != set(self.modules.keys())) or
-                any(self.orig_modules[k] != self.modules[k] for k in self.modules))
+        if current_body != self.orig_body:
+            console.log('Mismatched body')
+            return True
+        if set(self.orig_modules.keys()) != set(self.modules.keys()):
+            console.log('Module list mismatch')
+            return True
+        for k in self.modules:
+            if self.orig_modules[k] != self.modules[k]:
+                console.log(f'Module {k} mismatch')
+                # console.log(f'Orig module {k}:')
+                # console.log(self.orig_modules[k])
+                # console.log(f'Current module {k}:')
+                # console.log(self.modules[k])
+                return True
+        return False
 
     def has_file(self):
         return self.file_handle != None
@@ -592,6 +604,9 @@ class App:
         await writable.write(full_html)
         await writable.close()
         console.log(f'Wrote {self.file_name}')
+        # Update known saved version
+        self.orig_body = html_body
+        self.orig_modules = dict(self.modules)
         self.update_ui(update_python_text=True)
 
     def new_module(self, name, current_python_code):
