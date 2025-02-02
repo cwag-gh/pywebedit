@@ -140,6 +140,7 @@ EXAMPLES = {
     "Using javascript libraries": [
         ("pixi", "Fast 2D graphics (pixi.js)"),
         ("pixi2", "Starfield with wrapped pixi.js"),
+        ("pixi_sound", "Starfield with sound (pixi-sound.js)"),
         ("three", "3D spinning cube (three.js)"),
     ],
     "Games and interaction": [
