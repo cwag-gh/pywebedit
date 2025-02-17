@@ -61,7 +61,7 @@ window.brython({'debug': 1, 'ids': ["pythoncode"]})
 <script type="text/python" id="__pwe_pixi">
 """Wraps pixi interface to act more like pygame."""
 
-from browser import window, document, aio
+from browser import window, document, aio, console
 
 # Global state
 app = None
@@ -69,14 +69,17 @@ drawing_container = None
 graphics = None
 update = None
 draw = None
+sprites = {}
+textures = {}
+subcontainer = None
 
-def run(update_fn, draw_fn, background_color, width, height):
+def run(update_fn, draw_fn, background_color, width, height, spriteinfo=None):
     """Start the game loop with the given update and draw functions."""
     global update, draw
     update = update_fn
     draw = draw_fn
     # Lightweight async wrapper
-    aio.run(setup_and_run(background_color, width, height))
+    aio.run(setup_and_run(background_color, width, height, spriteinfo))
 
 def _clear(ticker):
     global drawing_container, graphics
@@ -96,7 +99,7 @@ def update_then_draw(ticker):
     # later by Pixi)
     draw()
         
-async def setup_and_run(background_color, width, height):
+async def setup_and_run(background_color, width, height, spritesinfo):
     global app, drawing_container, graphics
     app = window.PIXI.Application.new()
     await app.init({
@@ -107,6 +110,11 @@ async def setup_and_run(background_color, width, height):
         'antialias': True,  # Enable antialiasing
         'resolution': window.devicePixelRatio or 1,  # Handle high DPI displays
     })
+
+    if spritesinfo:
+        for basepath, imgsize, regions in spritesinfo:
+            await addsprites(basepath, imgsize, regions)
+    
     document.body.appendChild(app.canvas)
     # Create a top level container for things that will be
     # added / cleared every tick
@@ -119,6 +127,47 @@ async def setup_and_run(background_color, width, height):
     # TODO: load assets in async
     app.ticker.add(_clear)
     app.ticker.add(update_then_draw)
+    
+
+async def addsprites(image_path, image_size, sprite_regions):
+    """Load sprites from a spritesheet.
+    
+    Args:
+        image_path (str): Path to the spritesheet image
+        image_size (tuple): Spritesheet image (w, h)
+        sprite_regions (dict): Dictionary mapping sprite names to their regions
+                               in the format (x, y, width, height)
+    """
+    global sprites, textures, spritesheets
+
+    # Create the object that is expected by spritesheet
+    spritedata = {
+        'frames': {},
+        'meta': {
+            'image': image_path,
+            'format': 'RGBA8888',
+            'size': {'w': image_size[0], 
+                     'h': image_size[1]},
+            'scale': 1}}
+    for name, region in sprite_regions.items():
+        spritedata['frames'][name] = {
+            'frame': { 'x': region[0], 'y': region[1], 'w': region[2], 'h': region[3]},
+            'sourceSize': { 'w': region[2], 'h': region[3]},
+            'spriteSourceSize': { 'x': 0, 'y': 0, 'w': region[2], 'h': region[3] },
+            'anchor': {'x': 0.5, 'y': 0.5}}
+
+    console.log(spritedata)
+
+    base_texture = await window.PIXI.Assets.load(image_path)
+    spritesheet = window.PIXI.Spritesheet.new(base_texture, spritedata)
+    
+    # Create all the textures from the base spritesheet
+    await spritesheet.parse()
+
+    # Store a link to all textures in a global textures
+    for name in spritesheet.textures:
+        textures[name] = spritesheet.textures[name]
+        console.log(textures[name])
 
 
 def screen_center():
@@ -135,6 +184,35 @@ def screen_dimensions():
 
 ## The drawing functions
 
+class container:
+    """Container that works as a context manager. 
+    
+    Only for sprites, currently. 
+    Only single level.
+    Pivot is set to center so that rotation works.
+    """
+    def __init__(self, x, y, rotation_deg):
+        self.x = x
+        self.y = y
+        self.rotation_deg = rotation_deg
+
+    def __enter__(self):
+        global subcontainer, drawing_container
+        assert subcontainer is None, 'No support yet for nested containers'
+        subcontainer = window.PIXI.Container.new()
+        drawing_container.addChild(subcontainer)
+        return subcontainer
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        global subcontainer
+        subcontainer.x = self.x
+        subcontainer.y = self.y
+        #subcontainer.pivot.x = subcontainer.width / 2
+        #subcontainer.pivot.y = subcontainer.height / 2
+        subcontainer.angle = self.rotation_deg
+        subcontainer = None
+
+
 def draw_line(x1, y1, x2, y2, color='black', width=1):
     """Draw a line from (x1,y1) to (x2,y2)"""
     global graphics
@@ -147,6 +225,20 @@ def draw_circle(x, y, radius, color='black', filled=False, width=1):
     """Draw a circle centered at (x,y)"""
     global graphics
     graphics.circle(x, y, radius)
+    if filled:
+        fillcolor = color if isinstance(filled, bool) else filled            
+        graphics.fill({'color': fillcolor})
+    graphics.stroke({'width': width, 'color': color})
+
+
+def draw_arc(x, y, radius, start_angle_deg, end_angle_deg, clockwise=True,
+            color='black', filled=False, width=1):
+    """Draw an arc centered at (x,y)"""
+    global graphics
+    deg_to_rad = 3.14159265358 / 180.0
+    graphics.arc(x, y, radius, 
+                 start_angle_deg * deg_to_rad, 
+                 end_angle_deg * deg_to_rad)
     if filled:
         fillcolor = color if isinstance(filled, bool) else filled            
         graphics.fill({'color': fillcolor})
@@ -188,6 +280,36 @@ def draw_triangle(p1, p2, p3, color='black', width=1):
     draw_line(*p1, *p2, color=color, width=width)
     draw_line(*p2, *p3, color=color, width=width)
     draw_line(*p3, *p1, color=color, width=width)
+
+
+def draw_sprite(name: str, x, y, scale=1.0, rotation_deg=None):
+    """Draw a sprite at the given position.
+    
+    Args:
+        name (str): Name of the sprite as defined in sprite_regions
+        x (float): X coordinate
+        y (float): Y coordinate
+        scale (float): Scale factor (default: 1.0)
+        rotation (float): Rotation in radians (optional)
+    """
+    global sprites, textures, app, drawing_container, subcontainer
+    
+    # For now, we draw a new sprite every frame - this does not take advantage
+    # of Pixi's full speed, but it aligns with our pygame approach
+    sprite = (window.PIXI.Sprite.new(textures[name]))
+
+    sprite.x = x
+    sprite.y = y
+    sprite.scale.set(scale, scale)
+    
+    if rotation_deg is not None:
+        sprite.angle = rotation_deg
+
+    if subcontainer is not None:
+        subcontainer.addChild(sprite)
+    else:
+        drawing_container.addChild(sprite)
+        
 
 
 </script>
