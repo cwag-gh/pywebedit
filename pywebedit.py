@@ -146,6 +146,7 @@ EXAMPLES = {
     "Games and interaction": [
         ("breakout", "Brick breaking"),
         ("lightcycles", "Lightcycles"),
+        ("basegame", "Template for pixi+sound games"),
     ],
 }
 
