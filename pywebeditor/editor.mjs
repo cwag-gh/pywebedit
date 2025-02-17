@@ -1,5 +1,5 @@
 import {basicSetup} from "codemirror"
-import {EditorState} from "@codemirror/state"
+import {EditorState, Prec} from "@codemirror/state"
 import {EditorView, keymap} from "@codemirror/view"
 import {indentUnit} from "@codemirror/language"
 import {indentWithTab} from "@codemirror/commands"
@@ -9,6 +9,7 @@ import {html} from "@codemirror/lang-html"
 // Explicitly assign to window to prevent tree-shaking
 window.basicSetup    = basicSetup;
 window.EditorState   = EditorState;
+window.Prec          = Prec;
 window.EditorView    = EditorView;
 window.keymap        = keymap;
 window.indentUnit    = indentUnit;

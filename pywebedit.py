@@ -35,9 +35,15 @@ HELP = f"""
   <ul>
     <li>Return: Accepts suggested completion</li>
     <li>Ctrl-f: Find / replace</li>
+    <li>Ctrl-Alt-\ (Cmd-Alt-\ on MacOS): Indent selection - can fix indentation</li>
     <li>Ctrl-/: Toggle comments on line</li>
+    <li>Shift-Alt-a: Toggle block comments on selection</li>
     <li>Tab: Indent line (press Esc then Tab to use default Tab functionality)</li>
     <li>Shift-Tab: Unindent line</li>
+    <li>Shift-Ctrl-k (Shift-Cmd-k on MacOS): Delete line</li>
+    <li>Shift-Ctrl-\ (Shift-Cmd-\ on MacOS): Move cursor to matching bracket or parenthesis</li>
+    <li>Alt-j: Select previous python module</li>
+    <li>Alt-l: Select next python module</li>
   </ul>
 </div>
 
@@ -193,10 +199,16 @@ class UI:
                             window.keymap.of([window.indentWithTab])]})
         self.python_editor = window.EditorView(
             {'parent': document['python_editor'],
-             'extensions': [window.basicSetup,
-                            window.python(),
-                            window.indentUnit.of('    '),
-                            window.keymap.of([window.indentWithTab])]})
+             'extensions': [
+                 window.basicSetup,
+                 window.python(),
+                 window.indentUnit.of('    '),
+                 window.keymap.of(
+                     [window.indentWithTab,
+                      {'key': 'Alt-j', 'preventDefault': True,
+                       'run': lambda e: self.incr_module(-1)},
+                      {'key': 'Alt-l', 'preventDefault': True,
+                       'run': lambda e: self.incr_module(+1)}])]})
 
         self._init_examples()
         self._init_pyfiles()
@@ -380,6 +392,19 @@ class UI:
             self.on_remove()
         else:
             self.app.select_module(module, self.contents_python(), self.viewinfo_python())
+
+    def _current_module_index(self):
+        modnames = list(self.app.modules.keys())
+        i_name = modnames.index(self.app.active_module)
+        return i_name
+
+    def incr_module(self, incr: int):
+        if len(self.app.modules) <= 1:
+            return
+        i_next = (self._current_module_index() + incr) % len(self.app.modules)
+        modnames = list(self.app.modules.keys())
+        self.app.select_module(modnames[i_next], self.contents_python(),
+                               self.viewinfo_python())
 
     def on_example_select(self, evt):
         # Since we really use this as a menu, automatically return to first choice.
