@@ -547,9 +547,10 @@ class App:
         self.ui.set_module_list(self.modules.keys())
         self.ui.set_active_module(self.active_module)
         if update_python_text:
+            self.ui.set_focus_python()
             viewinfo = self.modules_viewinfo.get(self.active_module, None)
             self.ui.set_contents_python(self.modules[self.active_module], viewinfo)
-            self.ui.set_focus_python()
+            # console.log(f'Updated ui with viewinfo: {viewinfo}')
 
     async def load_example(self, name):
         # Assumes overwrite check has already been completed
