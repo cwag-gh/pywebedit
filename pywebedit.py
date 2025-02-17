@@ -1,5 +1,6 @@
 # Main python code
 
+from dataclasses import dataclass
 from browser import document, window, bind, aio, console, html
 from browser.widgets.dialog import InfoDialog, Dialog, EntryDialog
 
@@ -167,6 +168,15 @@ def add_option(select, title, value):
         option = html.OPTION(title)
         option.attrs['value'] = value
         select <= option
+
+
+@dataclass
+class ViewInfo:
+    """Holds the cursor and scroll state of an editor view."""
+    scrolltop: int
+    scrollleft: int
+    cursor_anchor: int
+    cursor_head: int
 
 
 class UI:
@@ -368,7 +378,7 @@ class UI:
         elif module == '__remove':
             self.on_remove()
         else:
-            self.app.select_module(module, self.contents_python())
+            self.app.select_module(module, self.contents_python(), self.viewinfo_python())
 
     def on_example_select(self, evt):
         # Since we really use this as a menu, automatically return to first choice.
@@ -420,6 +430,12 @@ class UI:
     def contents_python(self):
         return self.python_editor.state.doc.toString().replace('\t', '    ')
 
+    def viewinfo_python(self) -> ViewInfo:
+        return ViewInfo(scrolltop =self.python_editor.scrollDOM.scrollTop,
+                        scrollleft=self.python_editor.scrollDOM.scrollLeft,
+                        cursor_anchor=self.python_editor.state.selection.main.anchor,
+                        cursor_head=self.python_editor.state.selection.main.head)
+
     def set_loaded_file(self, file_name):
         document.getElementById('filename').innerHTML = f'&lt;pywebedit&gt; {file_name}'
         document.title = f'<pywebedit> {file_name}'
@@ -429,10 +445,18 @@ class UI:
                                                'to': self.html_editor.state.doc.length,
                                                'insert': code}})
 
-    def set_contents_python(self, code):
-        self.python_editor.dispatch({'changes': {'from': 0,
-                                                 'to': self.python_editor.state.doc.length,
-                                                 'insert': code}})
+    def set_contents_python(self, code, viewinfo=None):
+        transaction = {'changes': {'from': 0,
+                                   'to': self.python_editor.state.doc.length,
+                                   'insert': code}}
+        if viewinfo is not None:
+            transaction['selection'] = {'anchor': viewinfo.cursor_anchor,
+                                        'head': viewinfo.cursor_head}
+        self.python_editor.dispatch(transaction)
+
+        if viewinfo is not None:
+              self.python_editor.scrollDOM.scrollTop = viewinfo.scrolltop
+              self.python_editor.scrollDOM.scrollLeft = viewinfo.scrollleft
 
     def set_example_choice(self, value):
         document['examples'].value = value
@@ -459,6 +483,7 @@ class App:
         self.file_handle = None
         self.file_name = None # Save file name separate
         self.modules: dict[str, str] = {'main': INITIAL_PYTHON}
+        self.modules_viewinfo: dict[str, ViewInfo] = {}
         self.active_module = 'main'
         self.orig_modules = dict(self.modules)
         self.orig_body = INITIAL_HTML
@@ -496,7 +521,8 @@ class App:
         self.ui.set_module_list(self.modules.keys())
         self.ui.set_active_module(self.active_module)
         if update_python_text:
-            self.ui.set_contents_python(self.modules[self.active_module])
+            viewinfo = self.modules_viewinfo.get(self.active_module, None)
+            self.ui.set_contents_python(self.modules[self.active_module], viewinfo)
             self.ui.set_focus_python()
 
     async def load_example(self, name):
@@ -541,6 +567,7 @@ class App:
         # Set up modules and active module
         self.modules = dict(modules)
         self.active_module = 'main'
+        self.modules_viewinfo = {}
         # Load successful
         self.ui.set_contents_html(body)
         self.update_ui(update_python_text=True)
@@ -650,9 +677,10 @@ class App:
         self.active_module = 'main'
         self.update_ui(update_python_text=True)
 
-    def select_module(self, name, current_python_code):
+    def select_module(self, name, current_python_code, python_viewinfo):
         assert name in self.modules
         self.modules[self.active_module] = current_python_code
+        self.modules_viewinfo[self.active_module] = python_viewinfo
         self.active_module = name
         self.update_ui(update_python_text=True)
 
