@@ -288,7 +288,8 @@ class UI:
             except JavascriptError:
                 # User cancelled
                 return
-        await self.app.save_file(handle, self.contents_html(), self.contents_python())
+        await self.app.save_file(handle, self.contents_html(),
+                                 self.contents_python(), self.viewinfo_python())
 
     async def on_save_as(self):
         await self.on_save(force_picker=True)
@@ -309,7 +310,7 @@ class UI:
 
     def _check_newname(self, name):
         if self._check_valid_module_name(name):
-            self.app.new_module(name, self.contents_python())
+            self.app.new_module(name, self.contents_python(), self.viewinfo_python())
 
     def _check_rename(self, name):
         if self._check_valid_module_name(name):
@@ -623,8 +624,9 @@ class App:
             p = p.replace('%' + key + '%', value)
         return p
 
-    async def save_file(self, file_handle, html_body, python_code):
+    async def save_file(self, file_handle, html_body, python_code, python_viewinfo):
         self.modules[self.active_module] = python_code
+        self.modules_viewinfo[self.active_module] = python_viewinfo
         self.file_handle = file_handle
         self.file_name = file_handle.name
         full_html = self.build_html(html_body, python_code)
@@ -637,9 +639,10 @@ class App:
         self.orig_modules = dict(self.modules)
         self.update_ui(update_python_text=True)
 
-    def new_module(self, name, current_python_code):
+    def new_module(self, name, current_python_code, python_viewinfo):
         assert name not in self.modules
         self.modules[self.active_module] = current_python_code
+        self.modules_viewinfo[self.active_module] = python_viewinfo
         self.active_module = name
         self.modules[name] = ''
         self.update_ui(update_python_text=True)
