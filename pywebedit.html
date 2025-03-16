@@ -310,6 +310,10 @@ class UI:
             add_option(select, title, value)
 
     def on_run(self, evt):
+        # Pass through application layer first
+        self.app.run(self.contents_html(), self.contents_python())
+
+    def run_html_in_new_window(self, html):
         try:
             if self.app_window:
                 self.app_window.close()
@@ -317,9 +321,9 @@ class UI:
             # Weird error in Chrome when someone reloads the generated tab,
             # and we then can't access it
             pass
+
         self.app_window = window.open()
-        self.app_window.document.write(self.app.build_html(self.contents_html(),
-                                                           self.contents_python()))
+        self.app_window.document.write(html)
         self.app_window.document.close()
 
         # Download to a file - user has to click on it, but works
@@ -509,6 +513,45 @@ class UI:
             if value:
                 onok(value)
 
+    def show_save_on_run_dialog(self, save_on_run: bool):
+        """Shows a save dialog with options for 'Save on run' and 'Don't show again'."""
+        d = Dialog("Save on run", ok_cancel=True)
+
+        # Create container for checkbox elements
+        container = html.DIV(style="margin: 10px 0")
+
+        # Create first checkbox for "Save on run?"
+        save_checkbox_div = html.DIV(style="margin-bottom: 10px")
+        save_checkbox = html.INPUT(type="checkbox", id="save_on_run_checkbox")
+        save_checkbox.checked = save_on_run
+        save_checkbox_label = html.LABEL("Automatically save when run?", style="margin-left: 5px")
+        save_checkbox_label.attrs["for"] = "save_on_run_checkbox"
+        save_checkbox_div <= save_checkbox + save_checkbox_label
+
+        # Create second checkbox for "Don't show this again"
+        show_checkbox_div = html.DIV()
+        show_checkbox = html.INPUT(type="checkbox", id="dont_show_checkbox")
+        show_checkbox.checked = True
+        show_checkbox_label = html.LABEL("Don't show this again", style="margin-left: 5px")
+        show_checkbox_label.attrs["for"] = "dont_show_checkbox"
+        show_checkbox_div <= show_checkbox + show_checkbox_label
+
+        # Add both checkbox divs to the container
+        container <= save_checkbox_div + show_checkbox_div
+
+        # Add the container to the dialog panel
+        d.panel <= container
+
+        # Define event handler for OK button
+        @bind(d.ok_button, "click")
+        def ok(evt):
+            save_on_run = save_checkbox.checked
+            dont_show_again = show_checkbox.checked
+            d.close()
+
+            # Update app settings
+            self.app.set_save_on_run(save_on_run, dont_show_again)
+
     def msg(self, title, text, top=None, left=None):
         d = InfoDialog(title, text, ok='Ok', top=top, left=left)
 
@@ -581,6 +624,8 @@ class App:
         self.active_module = 'main'
         self.orig_modules = dict(self.modules)
         self.orig_body = INITIAL_HTML
+        self.save_on_run = False
+        self.show_save_on_run = True
 
         self.ui = UI(self)
 
@@ -632,11 +677,20 @@ class App:
             if self.load_html(request.data):
                 self.file_handle = None
                 self.file_name = f'{name}.html'
+                self.reset_save_on_run()
                 self.ui.set_loaded_file(f'{name}.html')
                 return
         except Exception as e:
             console.log(str(e))
             self.ui.err(f'Unable to load {relative_url} from the server.')
+
+    def reset_save_on_run(self):
+        self.save_on_run = False
+        self.show_save_on_run = True
+
+    def set_save_on_run(self, save_on_run, dont_show_again):
+        self.save_on_run = save_on_run
+        self.show_save_on_run = not dont_show_again
 
     async def open_file(self, file_handle):
         f = await file_handle.getFile()
@@ -647,6 +701,7 @@ class App:
         self.file_handle = file_handle
         self.file_name = file_handle.name
         console.log(f'Opened {file_handle.name}.')
+        self.reset_save_on_run()
         self.ui.set_loaded_file(self.file_name)
 
     def load_html(self, contents):
@@ -690,6 +745,14 @@ class App:
 
         return body, modules
 
+    def run(self, html_body, python_code):
+        html = self.build_html(html_body, python_code)
+        if self.save_on_run:
+            assert self.file_handle is not None
+            aio.run(self.save_file(self.file_handle, html_body, python_code,
+                                   self.modules_viewinfo[self.active_module], quiet=True))
+        self.ui.run_html_in_new_window(html)
+
     def build_html(self, html_body, python_code):
         """Build the full html text, inserting the user editable sections into the template."""
         self.modules[self.active_module] = python_code
@@ -718,7 +781,7 @@ class App:
             p = p.replace('%' + key + '%', value)
         return p
 
-    async def save_file(self, file_handle, html_body, python_code, python_viewinfo):
+    async def save_file(self, file_handle, html_body, python_code, python_viewinfo, quiet=False):
         self.modules[self.active_module] = python_code
         self.modules_viewinfo[self.active_module] = python_viewinfo
         self.file_handle = file_handle
@@ -732,6 +795,8 @@ class App:
         self.orig_body = html_body
         self.orig_modules = dict(self.modules)
         self.update_ui(update_python_text=True)
+        if not quiet and self.show_save_on_run:
+            self.ui.show_save_on_run_dialog(self.save_on_run)
 
     def new_module(self, name, current_python_code, python_viewinfo):
         assert name not in self.modules
