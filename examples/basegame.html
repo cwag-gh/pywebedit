@@ -179,7 +179,8 @@ def screen_center():
 def screen_dimensions():
     global app
     dpr = window.devicePixelRatio or 1
-    return (app.canvas.width / dpr / 2, app.canvas.height / dpr / 2)
+    return (app.renderer.width  / app.renderer.resolution,
+            app.renderer.height / app.renderer.resolution)
     
 
 ## The drawing functions
