@@ -5,11 +5,10 @@
   <meta charset="utf-8">
   <title>&lt;pywebedit&gt; Code python in the browser, even offline</title>
 
-  <!-- Use latest versions of brython -->
-  <script src="https://raw.githack.com/brython-dev/brython/master/www/src/brython.js" crossorigin="anonymous"> </script>
-  <script>typeof brython === "undefined" && document.write('<script src="brython.js">\x3C/script>')</script>
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.1/brython.min.js"></script>
+  <script>typeof brython === "undefined" && document.write('<script src="brython.min.js">\x3C/script>')</script>
 
-  <script src="https://raw.githack.com/brython-dev/brython/master/www/src/brython_stdlib.js" crossorigin="anonymous"> </script>
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.1/brython_stdlib.js"></script>
   <script>typeof __BRYTHON__.use_VFS === "undefined" && document.write('<script src="brython_stdlib.js">\x3C/script>')</script>
 
   <script type="text/javascript" src="pywebeditor.min.js"></script>
