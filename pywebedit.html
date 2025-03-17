@@ -43,10 +43,11 @@
   <div class="row">
     <div class="column">
       <div class="row toolbar">
-        <button id="btnrun" class="mainbtn"> Run </button>
-        <button id="btnopen"> Open </button>
-        <button id="btnsave"> Save </button>
-        <button id="btnsaveas"> Save As </button>
+        <button id="btnrun" class="mainbtn" title="Run the HTML + Python code">Run</button>
+        <button id="btnopen" title="Open a saved pywebedit HTML file">Open</button>
+        <button id="btnsave" title="Save your project as a runnable HTML file">Save</button>
+        <button id="btnsaveas" title="Save the current project with a different name">Save As</button>
+        <button id="btnexport" title="Save the current project as a complete, standalone HTML file for easy distribution">Export</button>
         <div id="filename" class="title">&lt;pywebedit&gt;</div>
       </div>
       <div class="content" id="html_editor">
@@ -55,10 +56,10 @@
 
     <div class="column">
       <div class="row toolbar help">
-        <select name="pyfiles" id="pyfiles"> </select>
+        <select name="pyfiles" id="pyfiles" title="Create and manage python modules"> </select>
         <div class="toolbar-right">
-          <select name="examples" id="examples"> </select>
-          <button id="btnhelp"> Help </button>
+          <select name="examples" id="examples" title="Load a sample project"> </select>
+          <button id="btnhelp" title="Show the help dialog">Help</button>
         </div>
       </div>
       <div class="content" id="python_editor">
