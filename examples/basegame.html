@@ -18,7 +18,7 @@ function __brython_pre_then_code() {
 <body onload="__brython_pre_then_code()">
 <!-- Import pixi, with fallback to a local copy -->
 <script
-src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.6.6/pixi.min.js">
+src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.9.0/pixi.min.js">
 </script>
 <script>typeof PIXI === "undefined" && 
     document.write('<script src="pixi.min.js">\x3C/script>')</script>
@@ -31,8 +31,13 @@ src="https://unpkg.com/@pixi/sound@6.0.1/dist/pixi-sound.js">
     document.write('<script src="pixi-sound.js">\x3C/script>')</script>
 
 <style>
-body { margin: 0; 
-       overflow: hidden; }
+body { margin: 0;
+       padding: 0;
+       width: 100%;
+       height: 100%;
+       overflow: hidden;
+       background-color: #000;
+     }
 </style>
 
 <script type="text/python" id="brythonpre">
@@ -61,10 +66,12 @@ window.brython({'debug': 1, 'ids': ["pythoncode"]})
 <script type="text/python" id="__pwe_pixi">
 """Wraps pixi interface to act more like pygame."""
 
-from browser import window, document, aio, console
+import math
+from browser import window, document, aio, console, bind
 
 # Global state
 app = None
+target_width, target_height = None, None # Virtual screen width
 drawing_container = None
 graphics = None
 update = None
@@ -72,6 +79,7 @@ draw = None
 sprites = {}
 textures = {}
 subcontainer = None
+
 
 def run(update_fn, draw_fn, background_color, width, height, spriteinfo=None):
     """Start the game loop with the given update and draw functions."""
@@ -81,6 +89,7 @@ def run(update_fn, draw_fn, background_color, width, height, spriteinfo=None):
     # Lightweight async wrapper
     aio.run(setup_and_run(background_color, width, height, spriteinfo))
 
+
 def _clear(ticker):
     global drawing_container, graphics
     # Remove all items that aren't the line graphics
@@ -89,7 +98,8 @@ def _clear(ticker):
             child.destroy()
     # Clear the drawn graphics container
     graphics.clear()
-        
+
+    
 def update_then_draw(ticker):
     global update, draw
     # Call the user's update function with a delta time argument
@@ -98,16 +108,20 @@ def update_then_draw(ticker):
     # to the drawing container (it will actually get rendered
     # later by Pixi)
     draw()
-        
+
+    
 async def setup_and_run(background_color, width, height, spritesinfo):
-    global app, drawing_container, graphics
+    global app, drawing_container, graphics, target_height, target_width
+    target_width = width
+    target_height = height
     app = window.PIXI.Application.new()
     await app.init({
+        # 'backgroundAlpha': 0, # Transparent background
+        'background': background_color, 
         'width': width,
         'height': height,
-        'background': background_color, 
-        'resizeTo': window,
         'antialias': True,  # Enable antialiasing
+        'autoDensity': True,
         'resolution': window.devicePixelRatio or 1,  # Handle high DPI displays
     })
 
@@ -127,7 +141,38 @@ async def setup_and_run(background_color, width, height, spritesinfo):
     # TODO: load assets in async
     app.ticker.add(_clear)
     app.ticker.add(update_then_draw)
-    
+    resize()
+
+
+@bind(window, 'resize')
+def resize(evt=None):
+    "Resize the canvas to fill the screen while maintaining aspect ratio"
+    global target_width, target_height, app
+
+    # Get the window dimensions
+    window_width = window.innerWidth
+    window_height = window.innerHeight
+
+    # Use the smaller scale to ensure the canvas fits the screen
+    scale = min(window_width  / target_width,
+                window_height / target_height)
+
+    # Calculate the centered position
+    new_width = round(target_width * scale)
+    new_height = round(target_height * scale)
+    left = math.floor((window_width - new_width) / 2)
+    top = math.floor((window_height - new_height) / 2)
+
+    # Set the canvas display size (CSS pixels)
+    app.canvas.style.position = 'absolute';
+    app.canvas.style.width = f'{new_width}px'
+    app.canvas.style.height = f'{new_height}px'
+    app.canvas.style.left = f'{left}px'
+    app.canvas.style.top = f'{top}px'
+
+    # Update the renderer size (in logical pixels)
+    app.renderer.resize(target_width, target_height)
+
 
 async def addsprites(image_path, image_size, sprite_regions):
     """Load sprites from a spritesheet.
@@ -151,9 +196,9 @@ async def addsprites(image_path, image_size, sprite_regions):
             'scale': 1}}
     for name, region in sprite_regions.items():
         spritedata['frames'][name] = {
-            'frame': { 'x': region[0], 'y': region[1], 'w': region[2], 'h': region[3]},
-            'sourceSize': { 'w': region[2], 'h': region[3]},
-            'spriteSourceSize': { 'x': 0, 'y': 0, 'w': region[2], 'h': region[3] },
+            'frame': {'x': region[0], 'y': region[1], 'w': region[2], 'h': region[3]},
+            'sourceSize': {'w': region[2], 'h': region[3]},
+            'spriteSourceSize': {'x': 0, 'y': 0, 'w': region[2], 'h': region[3]},
             'anchor': {'x': 0.5, 'y': 0.5}}
 
     console.log(spritedata)
@@ -171,16 +216,12 @@ async def addsprites(image_path, image_size, sprite_regions):
 
 
 def screen_center():
-    global app
     w, h = screen_dimensions()
     return (w / 2, h / 2)
 
 
 def screen_dimensions():
-    global app
-    dpr = window.devicePixelRatio or 1
-    return (app.renderer.width  / app.renderer.resolution,
-            app.renderer.height / app.renderer.resolution)
+    return (target_width, target_height)
     
 
 ## The drawing functions
@@ -477,6 +518,7 @@ def random_pos():
     return (random.randint(int(cx - w/4), int(cx + w/4)),
             random.randint(int(cy - h/4), int(cy + h/4)))
 
+
 class Square:
     """A floating square object."""
     def __init__(self):
@@ -506,12 +548,11 @@ class Square:
 
     def draw(self):
         pixi.draw_rect(self.pos[0], self.pos[1], self.size, self.size, 
-                       filled=(self.color[0] * 0.8, self.color[1] * 0.8, self.color[2] * 0.8),
+                       filled=(self.color[0] * 0.8,
+                               self.color[1] * 0.8,
+                               self.color[2] * 0.8),
                        color=self.color, linewidth=3)
 
-class Lander:
-    pass
-    # This should be a sprite
 
 def update(dt):
     global time, actors
