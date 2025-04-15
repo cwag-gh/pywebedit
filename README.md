@@ -43,8 +43,24 @@ See the live version [here](https://robotfantastic.org/pywebedit/).
 
 ## TODO
 
+For export:
+- list libraries, with checkbox
+- images
+- sounds
+- Button: export as zip
+  - all checked above will export as local files
+- Button: export as html
+  - all check above will be encoded into the html
+  - Option - with compression?
+
+
+- Maybe "use" statements that load scripts in a useful way?
+- Auto collate examples directory (and headers) into examples.js
+  - What to do about sounds and images?
+- Support export to github
+- support save/load from google drive?
 - Disable other buttons when help window is up
-- Fix game template screen sizing
+- DONE Fix game template screen sizing
 - Add all examples to offline build, get them working
 - Add console
 - Fix keypresses on Windows
@@ -70,3 +86,9 @@ See the live version [here](https://robotfantastic.org/pywebedit/).
   - https://tonejs.github.io/
   - https://buzz.jaysalvat.com/ for audio
   - pixi-sound.js
+- For oauth server for github:
+  - https://sphaerula.com/blog/posts/wsgi-and-cgi-apps-in-a-dreamhost-shared-hosting-account/
+    - Seems that running python as cgi is still working and dead
+      simple
+    - And, from https://docs.python.org/2/howto/webservers.html shows
+      how to enable nice debugging
