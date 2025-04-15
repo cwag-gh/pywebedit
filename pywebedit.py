@@ -218,6 +218,7 @@ class UI:
         document['btnopen'].bind('click', self.on_open_precheck)
         document['btnsave'].bind('click', lambda e: aio.run(self.on_save()))
         document['btnsaveas'].bind('click', lambda e: aio.run(self.on_save_as()))
+        document['btnexport'].bind('click', self.on_export)
         document['examples'].bind('change', self.on_example_select)
         document['pyfiles'].bind('change', self.on_pyfiles_select)
         document['btnhelp'].bind('click', self.on_help)
@@ -447,7 +448,7 @@ class UI:
 
     def show_save_on_run_dialog(self, save_on_run: bool):
         """Shows a save dialog with options for 'Save on run' and 'Don't show again'."""
-        d = Dialog("Save on run", ok_cancel=True)
+        d = Dialog("Save on run", ok_cancel=True, top=100, left=200)
 
         # Create container for checkbox elements
         container = html.DIV(style="margin: 10px 0")
@@ -545,6 +546,78 @@ class UI:
 
     def set_focus_python(self):
         self.python_editor.focus()
+
+    def on_export(self, evt):
+        "Display a dialog with checkboxes for selecting JavaScript libraries to include in the export."
+
+        # Create the dialog
+        d = Dialog("Select libraries to include", ok_cancel=("Export", "Cancel"), top=100, left=200)
+
+        # Define available libraries
+        # Format: (library_name, default_checked, description, is_required)
+        libraries = [
+            ("brython.min.js", True, "Core Brython functionality (required)", True),
+            ("brython_stdlib.js", True, "Brython standard library", False),
+            ("pixi.min.js", False, "2D WebGL renderer", False),
+            ("pixi-sound.js", False, "Sound extension for Pixi.js", False),
+            ("three.min.js", False, "3D graphics library", False),
+            # Add more libraries as needed
+        ]
+
+        # Create a container div for the library list
+        container = html.DIV(style="max-height: 300px; overflow-y: auto;")
+
+        # Add description
+        description = html.P("Select which JavaScript libraries to include in your exported file:",
+                             style="margin-bottom: 15px;")
+        container <= description
+
+        # Dictionary to keep track of checkboxes
+        checkboxes = {}
+
+        # Add each library as a checkbox option
+        for lib_name, default_checked, lib_desc, is_required in libraries:
+            # Create a div for each library
+            lib_div = html.DIV(style="margin-bottom: 10px; display: flex; align-items: center;")
+
+            # Create the checkbox
+            checkbox = html.INPUT(type="checkbox", id=f"lib_{lib_name.replace('.', '_')}")
+            checkbox.checked = default_checked
+            checkbox.disabled = is_required  # Disable checkbox if library is required
+
+            # Label with library name and description
+            label_text = f"{lib_name}"
+            if lib_desc:
+                label_text += f" - {lib_desc}"
+            label = html.LABEL(label_text, style="margin-left: 8px; flex: 1;")
+            label.attrs["for"] = checkbox.id
+
+            # Add elements to the div
+            lib_div <= checkbox + label
+
+            # Add the div to the container
+            container <= lib_div
+
+            # Store the checkbox reference
+            checkboxes[lib_name] = checkbox
+
+        # Add note about required libraries
+        note = html.P("Note: Required libraries cannot be deselected.",
+                      style="font-style: italic; margin-top: 15px; font-size: 0.9em;")
+        container <= note
+
+        # Add the container to the dialog
+        d.panel <= container
+
+        # Handle the OK button click
+        @bind(d.ok_button, "click")
+        def ok_click(evt):
+            # Get the list of selected libraries
+            selected_libs = [lib_name for lib_name, checkbox in checkboxes.items()
+                            if checkbox.checked]
+
+            # Close the dialog
+            d.close()
 
 
 class App:
@@ -777,6 +850,8 @@ class App:
         self.modules_viewinfo[self.active_module] = python_viewinfo
         self.active_module = name
         self.update_ui(update_python_text=True)
+
+
 
 
 app = App()
