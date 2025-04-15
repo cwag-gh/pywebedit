@@ -24,11 +24,11 @@ all: dist
 clean:
 	rm -rf dist
 
-pywebedit.html: pywebedit.py
-	python utils/tagreplace.py -i $@ "<script type=\"text/python\">" "</script>" $<
+dist/pywebedit.html: pywebedit.py pywebedit.html_template
+	python utils/tagreplace.py pywebedit.html_template "<script type=\"text/python\">" "</script>" pywebedit.py -o $@
 
-dev.html: pywebedit.py
-	python utils/tagreplace.py -i $@ "<script type=\"text/python\">" "</script>" $<
+dist/dev.html: pywebedit.py dev.html_template
+	python utils/tagreplace.py dev.html_template "<script type=\"text/python\">" "</script>" pywebedit.py -o $@
 
 dist/pywebeditor.min.js: pywebeditor/package.json pywebeditor/editor.mjs pywebeditor/rollup.config.js
 	cd pywebeditor && npm run build
@@ -44,9 +44,11 @@ dist/%.css:
 	mkdir -p dist
 	cd dist && curl -O $(filter %/$(notdir $@),$(CSS_DEPS))
 
-dist/pywebedit.zip: pywebedit.html dist/pywebeditor.min.js $(ALL_DIST_FILES)
-	cd dist && zip pywebedit.zip ../pywebedit.html pywebeditor.min.js $(ALL_FILES)
+dist/pywebedit.zip: dist/pywebedit.html dist/pywebeditor.min.js $(ALL_DIST_FILES)
+	cd dist && zip pywebedit.zip pywebedit.html pywebeditor.min.js $(ALL_FILES)
 
-dist: pywebedit.html dist/pywebedit.zip dev.html
-	cp pywebedit.html dist/index.html
-	cp dev.html dist/dev.html
+dist/index.html: dist/pywebedit.html
+	cd dist && cp pywebedit.html index.html
+
+dist: dist/index.html dist/dev.html dist/pywebedit.zip
+
