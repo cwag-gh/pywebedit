@@ -36,13 +36,13 @@ HELP = f"""
   <ul>
     <li>Return: Accepts suggested completion</li>
     <li>Ctrl-f: Find / replace</li>
-    <li>Ctrl-Alt-\ (Cmd-Alt-\ on MacOS): Indent selection - can fix indentation</li>
+    <li>Ctrl-Alt-\\ (Cmd-Alt-\\ on MacOS): Indent selection - can fix indentation</li>
     <li>Ctrl-/: Toggle comments on line</li>
     <li>Shift-Alt-a: Toggle block comments on selection</li>
     <li>Tab: Indent line (press Esc then Tab to use default Tab functionality)</li>
     <li>Shift-Tab: Unindent line</li>
     <li>Shift-Ctrl-k (Shift-Cmd-k on MacOS): Delete line</li>
-    <li>Shift-Ctrl-\ (Shift-Cmd-\ on MacOS): Move cursor to matching bracket or parenthesis</li>
+    <li>Shift-Ctrl-\\ (Shift-Cmd-\\ on MacOS): Move cursor to matching bracket or parenthesis</li>
     <li>Alt-j: Select previous python module</li>
     <li>Alt-l: Select next python module</li>
   </ul>
