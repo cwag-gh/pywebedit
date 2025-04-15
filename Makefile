@@ -34,6 +34,9 @@ dist/pywebeditor.min.js: pywebeditor/package.json pywebeditor/editor.mjs pywebed
 	cd pywebeditor && npm run build
 	ls -al $@
 
+dist/examples.js: examples.py
+	python examples.py $@
+
 # Generic rule for downloading JS files
 dist/%.js:
 	mkdir -p dist
@@ -44,8 +47,8 @@ dist/%.css:
 	mkdir -p dist
 	cd dist && curl -O $(filter %/$(notdir $@),$(CSS_DEPS))
 
-dist/pywebedit.zip: dist/pywebedit.html dist/pywebeditor.min.js $(ALL_DIST_FILES)
-	cd dist && zip pywebedit.zip pywebedit.html pywebeditor.min.js $(ALL_FILES)
+dist/pywebedit.zip: dist/pywebedit.html dist/pywebeditor.min.js dist/examples.js $(ALL_DIST_FILES)
+	cd dist && zip pywebedit.zip pywebedit.html pywebeditor.min.js dist/examples.js $(ALL_FILES)
 
 dist/index.html: dist/pywebedit.html
 	cd dist && cp pywebedit.html index.html

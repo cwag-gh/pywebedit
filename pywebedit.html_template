@@ -11,7 +11,11 @@
   <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.1/brython_stdlib.js"></script>
   <script>typeof __BRYTHON__.use_VFS === "undefined" && document.write('<script src="brython_stdlib.js">\x3C/script>')</script>
 
+  <!-- Loads our CodeMirror-based editor -->
   <script type="text/javascript" src="pywebeditor.min.js"></script>
+
+  <!-- Loads all of our examples -->
+  <script type="text/javascript" src="examples.js"></script>
 
   <!-- Simple styling to get the tight layout we want. -->
   <style>

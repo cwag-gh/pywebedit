@@ -61,7 +61,7 @@ For export:
 - support save/load from google drive?
 - Disable other buttons when help window is up
 - DONE Fix game template screen sizing
-- Add all examples to offline build, get them working
+- DONE Add all examples to offline build, get them working
 - Add console
 - Fix keypresses on Windows
 - Fix issue where mismatched tags in the body section will screw up

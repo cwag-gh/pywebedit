@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from browser import document, window, bind, aio, console, html
 from browser.widgets.dialog import InfoDialog, Dialog, EntryDialog
+import base64
 
 BRYTHON_VERSION = '3.13.1'
 PYWEBEDIT_VERSION = '0.2.0'
@@ -121,42 +122,6 @@ MODULE_TEMPLATE = """
 %endscript%
 """.strip()
 
-EXAMPLES = {
-    "Getting started": [
-        ("hello",       "1) Hello world"),
-        ("input0",      "2) Basic input"),
-        ("basic_html",  "3) Initial HTML"),
-        ("error",       "4) Showing python errors"),
-        ("styled_html", "5) Styled HTML"),
-        ("bind",        "6) Run python based on events"),
-        ("modules",     "7) Organizing code into modules"),
-        ("console",     "8) Simple control flow with async"),
-    ],
-    "Interacting with HTML": [
-        ("calculator", "Calculator with styled buttons"),
-        ("sort_table", "Table with sortable columns"),
-        ("sphere", "Decode messages from Sphere"),
-    ],
-    "Drawing and animating": [
-        ("clock", "Analog clock"),
-        ("barcode", "Generate barcodes"),
-        ("pythagoras", "Animated geometry proof"),
-        ("pixelperfect", "Perfect pixel-aligned drawing"),
-        ("springs", "Spring animation with vectors"),
-    ],
-    "Using javascript libraries": [
-        ("pixi", "Fast 2D graphics (pixi.js)"),
-        ("pixi2", "Starfield with wrapped pixi.js"),
-        ("pixi_sound", "Starfield with sound (pixi-sound.js)"),
-        ("three", "3D spinning cube (three.js)"),
-    ],
-    "Games and interaction": [
-        ("breakout", "Brick breaking"),
-        ("lightcycles", "Lightcycles"),
-        ("basegame", "Template for pixi+sound games"),
-    ],
-}
-
 PYFILES = [('main', 'main'),
            (None, None),
            ('New python module', '__new'),
@@ -230,11 +195,12 @@ class UI:
     def _init_examples(self):
         select = document['examples']
         add_option(select, 'Load example...', '')
-        for group_name, examples in EXAMPLES.items():
+        # global variable window.EXAMPLES_DATA is defined in examples.js
+        for category in window.EXAMPLES_DATA:
             group = html.OPTGROUP()
-            group.attrs['label'] = group_name
-            for value, display_text in examples:
-                add_option(group, display_text, value)
+            group.attrs['label'] = category['category']
+            for example in category['examples']:
+                add_option(group, example['help'], example['id'])
             select <= group
 
     def _init_pyfiles(self):
@@ -672,22 +638,25 @@ class App:
 
     async def load_example(self, name):
         # Assumes overwrite check has already been completed
-        relative_url = f'./examples/{name}.html'
-        try:
-            request = await aio.get(relative_url, format='text')
-            if not(request.status == 200 or request.status == 0):
-                raise RuntimeError(f'HTTP error: status {request.status}')
-            if not request.data:
-                raise RuntimeError(f'Empty request data')
-            if self.load_html(request.data):
-                self.file_handle = None
-                self.file_name = f'{name}.html'
-                self.reset_save_on_run()
-                self.ui.set_loaded_file(f'{name}.html')
-                return
-        except Exception as e:
-            console.log(str(e))
-            self.ui.err(f'Unable to load {relative_url} from the server.')
+        # All examples have been loaded as part of examples.js into window.EXAMPLES_DATA
+        # Find the example in window.EXAMPLES_DATA
+        for category in window.EXAMPLES_DATA:
+            for example in category['examples']:
+                if example['id'] == name:
+                    try:
+                        if self.load_html(base64.b64decode(example['content']).decode('utf-8')):
+                            self.file_handle = None
+                            self.file_name = f'{name}.html'
+                            self.reset_save_on_run()
+                            self.ui.set_loaded_file(f'{name}.html')
+                        else:
+                            self.ui.err(f'Parsing error when loading example {name}.')
+                        return
+                    except Exception as e:
+                        console.log(str(e))
+                        self.ui.err(f'Unable to load example {name}.')
+                        return
+        self.ui.err(f'Unable to find example {name} in loaded examples.')
 
     def reset_save_on_run(self):
         self.save_on_run = False
