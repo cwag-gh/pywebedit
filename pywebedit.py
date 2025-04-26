@@ -129,7 +129,10 @@ PYFILES = [('main', 'main'),
            (None, None),
            ('Export this python module', '__export'),
            ('Rename this python module', '__rename'),
-           ('Remove this python module', '__remove')]
+           ('Remove this python module', '__remove'),
+           (None, None),
+           ('Add sounds...', '__add_sounds'),
+           ('Add images...', '__add_images')]
 
 
 def add_option(select, title, value):
@@ -183,7 +186,7 @@ class UI:
         document['btnopen'].bind('click', self.on_open_precheck)
         document['btnsave'].bind('click', lambda e: aio.run(self.on_save()))
         document['btnsaveas'].bind('click', lambda e: aio.run(self.on_save_as()))
-        document['btnexport'].bind('click', self.on_export)
+        document['btnexport'].bind('click', self.export_dialog)
         document['examples'].bind('change', self.on_example_select)
         document['pyfiles'].bind('change', self.on_pyfiles_select)
         document['btnhelp'].bind('click', self.on_help)
@@ -334,16 +337,6 @@ class UI:
             return
         await self.app.export_module(handle, self.contents_python())
 
-    def on_remove(self):
-        d = Dialog('Warning...', ok_cancel=('Proceed', 'Cancel'))
-        d.panel <= html.DIV(f'Proceed with removing module {self.app.active_module}? '
-                            'Non-exported changes will be lost.')
-
-        @bind(d.ok_button, 'click')
-        def ok(_):
-            d.close()
-            self.app.remove_module()
-
     def on_pyfiles_select(self, evt):
         module = evt.target.value
         if module.startswith('__'):
@@ -361,8 +354,21 @@ class UI:
             self.inputdialog('Rename module', 'New name', self._check_rename)
         elif module == '__remove':
             self.on_remove()
+        elif module == '__add_sounds':
+            self.on_add_sounds()
+        elif module == '__add_images':
+            self.on_add_images()
         else:
             self.app.select_module(module, self.contents_python(), self.viewinfo_python())
+
+    def on_add_sounds(self):
+        """Show the add sounds dialog."""
+        # TODO: disable other buttons
+        d = SoundsDialog(self.app, top=100, left=200)
+
+    def on_add_images(self):
+        """Show a dialog with a table of already included images, and a button to add more."""
+        pass
 
     def _current_module_index(self):
         modnames = list(self.app.modules.keys())
@@ -513,7 +519,17 @@ class UI:
     def set_focus_python(self):
         self.python_editor.focus()
 
-    def on_export(self, evt):
+    def on_remove(self):
+        d = Dialog('Warning...', ok_cancel=('Proceed', 'Cancel'))
+        d.panel <= html.DIV(f'Proceed with removing module {self.app.active_module}? '
+                            'Non-exported changes will be lost.')
+
+        @bind(d.ok_button, 'click')
+        def ok(_):
+            d.close()
+            self.app.remove_module()
+
+    def export_dialog(self, evt):
         "Display a dialog with checkboxes for selecting JavaScript libraries to include in the export."
 
         # Create the dialog
@@ -586,12 +602,20 @@ class UI:
             d.close()
 
 
+class SoundsDialog(Dialog):
+    def __init__(self, app, top=100, left=200):
+        super().__init__("Manage sounds", ok_cancel=("Close", "Cancel"), top=top, left=left)
+        self.app = app
+
+
 class App:
     def __init__(self):
         self.file_handle = None
         self.file_name = None # Save file name separate
         self.modules: dict[str, str] = {'main': INITIAL_PYTHON}
         self.modules_viewinfo: dict[str, ViewInfo] = {}
+        self.sounds: dict[str, str] = {} # Name -> base64 encoded sound as a data URL
+        self.images: dict[str, str] = {} # Name -> base64 encoded image as a data URL
         self.active_module = 'main'
         self.orig_modules = dict(self.modules)
         self.orig_body = INITIAL_HTML
