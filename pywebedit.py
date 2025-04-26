@@ -603,9 +603,206 @@ class UI:
 
 
 class SoundsDialog(Dialog):
+    """Dialog for managing sounds.
+
+    Shows a list of sounds as rows in a table. For each sound in the row, the user can:
+    - Play the sound
+    - Delete the sound
+    - Rename the sound
+    These functions are shown as small buttons in the row.
+    The sound size is shown in the row, in kB, as well as the duration in seconds. The duration
+    is calculated from metadata and is dynamically updated after the dialog is opened.
+
+    The user can also add a new sound, which will be added to the table.
+    """
     def __init__(self, app, top=100, left=200):
-        super().__init__("Manage sounds", ok_cancel=("Close", "Cancel"), top=top, left=left)
+        super().__init__("Manage sounds", ok_cancel=False, top=top, left=left)
         self.app = app
+        self.sound_table = None
+        self.durations = {}  # Cache for sound durations
+        self.init_ui()
+        self.populate_table()
+
+    def init_ui(self):
+        """Initialize the dialog UI with a table for sounds and an add button."""
+        container = html.DIV(style="width: 500px;")
+
+        # Add button at the top
+        add_button = html.BUTTON("Add sound", style="margin-bottom: 10px;")
+        add_button.bind("click", lambda evt: self.add_sound())
+        container.appendChild(add_button)
+
+        # Create table for sounds
+        self.sound_table = html.TABLE(style="width: 100%; border-collapse: collapse;")
+        self.sound_table.appendChild(html.TR(
+            html.TH("Name", style="text-align: left;") +
+            html.TH("Size", style="text-align: right;") +
+            html.TH("Duration", style="text-align: right;") +
+            html.TH("Actions", style="text-align: center;")
+        ))
+
+        container.appendChild(self.sound_table)
+        self.panel <= container
+
+    def populate_table(self):
+        """Fill the table with sound entries."""
+        # Clear existing rows except header
+        if self.sound_table and len(self.sound_table.childNodes) > 1:
+            while len(self.sound_table.childNodes) > 1:
+                self.sound_table.removeChild(self.sound_table.lastChild)
+
+        # Add a row for each sound
+        for name, data_url in self.app.sounds.items():
+            self.add_row(name, data_url)
+
+    def add_row(self, name, data_url):
+        """Add a row to the table for a sound."""
+        if not self.sound_table:
+            return
+
+        # Calculate size in kB
+        # Remove the data:audio/* prefix to get the raw base64
+        base64_data = data_url.split(',')[1]
+        size_kb = round(len(base64_data) * 3 / 4 / 1024, 1)  # Approximate size in kB
+
+        # Create row with name, size, and action buttons
+        row = html.TR(style="border-bottom: 1px solid #ddd;")
+
+        # Name cell
+        name_cell = html.TD(name, style="padding: 5px;")
+
+        # Size cell
+        size_cell = html.TD(f"{size_kb} kB", style="text-align: right; padding: 5px;")
+
+        # Duration cell - initially empty, will be populated later
+        duration_cell = html.TD("...", style="text-align: right; padding: 5px;")
+
+        # Actions cell with play, rename, and delete buttons
+        actions_cell = html.TD(style="text-align: center; padding: 5px;")
+
+        # Play button
+        play_button = html.BUTTON("▶", style="margin-right: 5px;")
+        play_button.bind("click", lambda evt, n=name: self.play_sound(n))
+
+        # Rename button
+        rename_button = html.BUTTON("✏️", style="margin-right: 5px;")
+        rename_button.bind("click", lambda evt, n=name: self.rename_sound(n))
+
+        # Delete button
+        delete_button = html.BUTTON("🗑️")
+        delete_button.bind("click", lambda evt, n=name: self.delete_sound(n))
+
+        actions_cell <= play_button + rename_button + delete_button
+
+        # Add cells to row
+        row <= name_cell + size_cell + duration_cell + actions_cell
+
+        # Add row to table
+        self.sound_table.appendChild(row)
+
+        # Calculate duration asynchronously
+        self.load_duration(name, data_url, duration_cell)
+
+    def load_duration(self, name, data_url, duration_cell):
+        """Load the duration of a sound and update the cell."""
+        audio = window.Audio.new(data_url)
+
+        def on_loaded(evt):
+            duration = round(audio.duration, 1)
+            self.durations[name] = duration
+            duration_cell.textContent = f"{duration}s"
+
+        def on_error(evt):
+            duration_cell.textContent = "Error"
+            console.log(f"Error loading duration for {name}")
+
+        audio.bind("loadedmetadata", on_loaded)
+        audio.bind("error", on_error)
+
+    def play_sound(self, name):
+        """Play a sound."""
+        audio = window.Audio.new(self.app.sounds[name])
+        try:
+            audio.play()
+        except Exception as e:
+            console.log(f'Error playing sound {name}: {e}')
+
+    def add_sound(self):
+        """Open a file picker to select a sound file."""
+        input_elem = html.INPUT(type="file", accept="audio/*")
+
+        def on_change(evt):
+            if input_elem.files.length == 0:
+                return
+
+            file = input_elem.files[0]
+            file_name = file.name.split('/')[-1].split('\\')[-1]
+            name = file_name.split('.')[0]
+
+            # If name already exists, add a number
+            base_name = name
+            counter = 1
+            while name in self.app.sounds:
+                name = f"{base_name}_{counter}"
+                counter += 1
+
+            reader = window.FileReader.new()
+
+            def on_load(evt):
+                data_url = reader.result
+                self.app.sounds[name] = data_url
+                self.add_row(name, data_url)
+
+            reader.bind("load", on_load)
+            reader.readAsDataURL(file)
+
+        input_elem.bind("change", on_change)
+        input_elem.click()
+
+    def rename_sound(self, name):
+        """Show a dialog to rename a sound."""
+        def on_rename(new_name):
+            if not new_name or new_name == name:
+                return
+
+            if new_name in self.app.sounds:
+                self.show_error(f"Sound name '{new_name}' already exists.")
+                return
+
+            # Rename sound
+            self.app.sounds[new_name] = self.app.sounds[name]
+            del self.app.sounds[name]
+
+            # Update table
+            self.populate_table()
+
+        # Create dialog to get new name
+        d = EntryDialog("Rename sound", "New name:")
+        d.entry.value = name
+
+        @bind(d, "entry")
+        def on_entry(evt):
+            new_name = d.value
+            d.close()
+            if new_name:
+                on_rename(new_name)
+
+    def delete_sound(self, name):
+        """Delete a sound after confirmation."""
+        d = Dialog("Confirm deletion", ok_cancel=("Delete", "Cancel"))
+        d.panel <= html.DIV(f"Are you sure you want to delete sound '{name}'?")
+
+        @bind(d.ok_button, "click")
+        def on_confirm(evt):
+            # Delete the sound
+            del self.app.sounds[name]
+            # Update the table
+            self.populate_table()
+            d.close()
+
+    def show_error(self, message):
+        """Show an error dialog."""
+        d = InfoDialog("Error", message, ok="OK")
 
 
 class App:
