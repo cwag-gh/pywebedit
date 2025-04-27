@@ -99,6 +99,12 @@ class __ErrorReporter:
         self.errdiv.textContent += ("\\n" + msg)
 sys.stderr = __ErrorReporter()
 
+# Load sound resouces
+window.SOUNDS = %sounds%
+
+# Load image resources
+window.IMAGES = %images%
+
 # Load modules - use runPythonSource as it is synchronous
 for module in [%modules%]:
     __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
@@ -866,6 +872,31 @@ class SoundsDialog(Dialog):
         d = InfoDialog("Error", message, ok="OK")
 
 
+def extract_between(s, start_token, end_token):
+    """Extracts the string between two tokens, exclusive.
+
+    Raises error if token is not present.
+    """
+    i_start = s.index(start_token) + len(start_token)
+    i_end = s.index(end_token, i_start)
+    return s[i_start:i_end]
+
+
+def parse_str_str_dict(s):
+    """Parse a dict[str, str] encoded as a string back into a dict.
+    """
+    d = {}
+    if not s or s.isspace():
+        return d
+    for row in s.split(',\n'):
+        i_q0 = row.index("'", 0)
+        i_q1 = row.index("'", i_q0+1)
+        i_q2 = row.index("'", i_q1+1)
+        i_q3 = row.index("'", i_q2+1)
+        d[row[i_q0+1:i_q1]] = row[i_q2+1:i_q3]
+    return d
+
+
 class App:
     def __init__(self):
         self.file_handle = None
@@ -962,7 +993,7 @@ class App:
 
     def load_html(self, contents):
         try:
-            body, modules = self.split_html(contents)
+            body, modules, sounds, images = self.split_html(contents)
         except Exception as e:
             console.log(e)
             self.ui.err('Looks like this file was not saved by pywebedit. Unable to load.')
@@ -974,20 +1005,32 @@ class App:
         self.modules = dict(modules)
         self.active_module = 'main'
         self.modules_viewinfo = {}
+        # Save resources
+        self.sounds = sounds
+        self.images = images
         # Load successful
         self.ui.set_contents_html(body)
         self.update_ui(update_python_text=True)
         return True
 
     def split_html(self, contents):
-        """Split out header, python scripts from saved html."""
+        """Split out header, python scripts, sounds, images from saved html."""
         body_and_scripts = contents.split('<body onload="__brython_pre_then_code()">')[1]
 
-        body, skip, *modfragments, script_and_foot = body_and_scripts.split(
+        body, precode, *modfragments, script_and_foot = body_and_scripts.split(
             '<' + 'script type="text/python" id=')
 
         # Body has extra line - remove it
         body = '\n'.join(body.splitlines()[1:])
+
+        # Extract sounds and images from precode
+        sounds = {}
+        images = {}
+        if 'window.SOUNDS = {' in precode:
+            sounds_dict_as_str = extract_between(precode, 'window.SOUNDS = {', '}')
+            images_dict_as_str = extract_between(precode, 'window.IMAGES = {', '}')
+            sounds = parse_str_str_dict(sounds_dict_as_str)
+            images = parse_str_str_dict(images_dict_as_str)
 
         modules = {}
         lines = script_and_foot.strip().splitlines()
@@ -999,7 +1042,7 @@ class App:
             modname = lines[0].replace('"__pwe_', '').replace('">', '')
             modules[modname] = '\n'.join(lines[1:-2])
 
-        return body, modules
+        return body, modules, sounds, images
 
     def run(self, html_body, python_code):
         html = self.build_html(html_body, python_code)
@@ -1025,13 +1068,18 @@ class App:
                 m = m.replace('%' + key + '%', value)
             module_texts.append(m)
 
+        sounds = "{" + ",\n".join(f"'{key}':'{val}'" for key,val in self.sounds.items()) + "}"
+        images = "{" + ",\n".join(f"'{key}':'{val}'" for key,val in self.images.items()) + "}"
+
         tagmap = {'brython_version': BRYTHON_VERSION,
                   'html_body':       html_body,
                   'python_code':     self.modules['main'],
                   'script':          '<' + 'script',
                   'endscript':       '<' + '/script>',
                   'modules':         ', '.join(f"'__pwe_{m}'" for m in self.modules if m != 'main'),
-                  'modulescripts':   '\n\n'.join(module_texts)}
+                  'modulescripts':   '\n\n'.join(module_texts),
+                  'sounds':          sounds,
+                  'images':          images}
         p = PAGE_TEMPLATE
         for key, value in tagmap.items():
             p = p.replace('%' + key + '%', value)
