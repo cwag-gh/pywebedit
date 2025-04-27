@@ -48,10 +48,9 @@ dist/%.css:
 	cd dist && curl -O $(filter %/$(notdir $@),$(CSS_DEPS))
 
 dist/pywebedit.zip: dist/pywebedit.html dist/pywebeditor.min.js dist/examples.js $(ALL_DIST_FILES)
-	cd dist && zip pywebedit.zip pywebedit.html pywebeditor.min.js dist/examples.js $(ALL_FILES)
+	cd dist && zip pywebedit.zip pywebedit.html pywebeditor.min.js examples.js $(ALL_FILES)
 
 dist/index.html: dist/pywebedit.html
 	cd dist && cp pywebedit.html index.html
 
 dist: dist/index.html dist/dev.html dist/pywebedit.zip
-
