@@ -363,8 +363,13 @@ class UI:
 
     def on_add_sounds(self):
         """Show the add sounds dialog."""
-        # TODO: disable other buttons
-        d = SoundsDialog(self.app, top=100, left=200)
+        # Store reference to the dialog so we can update it
+        self.sounds_dialog = SoundsDialog(self.app, top=100, left=200)
+
+    def update_sound_dialog(self):
+        """Update the sound dialog if it's currently open."""
+        if hasattr(self, 'sounds_dialog') and self.sounds_dialog:
+            self.sounds_dialog.populate_table()
 
     def on_add_images(self):
         """Show a dialog with a table of already included images, and a button to add more."""
@@ -652,8 +657,8 @@ class SoundsDialog(Dialog):
                 self.sound_table.removeChild(self.sound_table.lastChild)
 
         # Add a row for each sound
-        for name, data_url in self.app.sounds.items():
-            self.add_row(name, data_url)
+        for name in self.app.get_sound_names():
+            self.add_row(name, self.app.get_sound(name))
 
     def add_row(self, name, data_url):
         """Add a row to the table for a sound."""
@@ -721,14 +726,16 @@ class SoundsDialog(Dialog):
 
     def play_sound(self, name):
         """Play a sound."""
-        audio = window.Audio.new(self.app.sounds[name])
+        audio = window.Audio.new(self.app.get_sound(name))
         try:
             audio.play()
         except Exception as e:
             console.log(f'Error playing sound {name}: {e}')
 
     def add_sound(self):
-        """Open a file picker to select a sound file."""
+        """Open a file picker to select a sound file.
+
+        If name already exists, open additional dialog to either replace or rename."""
         input_elem = html.INPUT(type="file", accept="audio/*")
 
         def on_change(evt):
@@ -739,19 +746,51 @@ class SoundsDialog(Dialog):
             file_name = file.name.split('/')[-1].split('\\')[-1]
             name = file_name.split('.')[0]
 
-            # If name already exists, add a number
-            base_name = name
-            counter = 1
-            while name in self.app.sounds:
-                name = f"{base_name}_{counter}"
-                counter += 1
-
             reader = window.FileReader.new()
 
             def on_load(evt):
                 data_url = reader.result
-                self.app.sounds[name] = data_url
-                self.add_row(name, data_url)
+
+                # Check if sound name already exists
+                if name in self.app.get_sound_names():
+                    # Create a dialog to ask what to do
+                    d = Dialog("Sound name exists", ok_cancel=False)
+                    d.panel <= html.DIV(f"A sound named '{name}' already exists. What would you like to do?")
+
+                    # Create buttons container
+                    buttons_div = html.DIV(style="margin-top: 15px; display: flex; justify-content: space-between;")
+
+                    # Replace button
+                    replace_btn = html.BUTTON("Replace existing sound", style="margin-right: 10px;")
+
+                    @bind(replace_btn, "click")
+                    def on_replace(evt):
+                        d.close()
+                        self.handle_replace_sound(name, data_url)
+
+                    # Rename button
+                    rename_btn = html.BUTTON("Use a different name")
+
+                    @bind(rename_btn, "click")
+                    def on_rename(evt):
+                        d.close()
+                        self.handle_rename_sound(name, data_url)
+
+                    # Cancel button
+                    cancel_btn = html.BUTTON("Cancel", style="margin-left: 10px;")
+
+                    @bind(cancel_btn, "click")
+                    def on_cancel(evt):
+                        d.close()
+
+                    # Add buttons to container
+                    buttons_div <= replace_btn + rename_btn + cancel_btn
+
+                    # Add buttons container to dialog
+                    d.panel <= buttons_div
+                else:
+                    # No conflict, add directly
+                    self.app.add_sound(name, data_url)
 
             reader.bind("load", on_load)
             reader.readAsDataURL(file)
@@ -759,23 +798,47 @@ class SoundsDialog(Dialog):
         input_elem.bind("change", on_change)
         input_elem.click()
 
+    def handle_replace_sound(self, name, data_url):
+        """Handle replacing an existing sound."""
+        # Delete the existing sound first
+        self.app.delete_sound(name)
+        # Then add the new sound with the same name
+        self.app.add_sound(name, data_url)
+
+    def handle_rename_sound(self, original_name, data_url):
+        """Handle renaming a new sound."""
+        # Create suggestion for new name
+        base_name = original_name
+        counter = 1
+        suggestion = f"{base_name}_{counter}"
+
+        # Find a name that doesn't exist
+        while suggestion in self.app.get_sound_names():
+            counter += 1
+            suggestion = f"{base_name}_{counter}"
+
+        # Show dialog to get new name
+        d = EntryDialog("Rename sound", f"New name for sound ('{original_name}' already exists):")
+        d.entry.value = suggestion
+
+        @bind(d, "entry")
+        def on_entry(evt):
+            new_name = d.value
+            d.close()
+
+            if not new_name:
+                return
+
+            if new_name in self.app.get_sound_names():
+                self.show_error(f"Sound name '{new_name}' also exists. Please choose another name.")
+                # Recursive call to try again
+                self.handle_rename_sound(original_name, data_url)
+            else:
+                # Add with the new name
+                self.app.add_sound(new_name, data_url)
+
     def rename_sound(self, name):
         """Show a dialog to rename a sound."""
-        def on_rename(new_name):
-            if not new_name or new_name == name:
-                return
-
-            if new_name in self.app.sounds:
-                self.show_error(f"Sound name '{new_name}' already exists.")
-                return
-
-            # Rename sound
-            self.app.sounds[new_name] = self.app.sounds[name]
-            del self.app.sounds[name]
-
-            # Update table
-            self.populate_table()
-
         # Create dialog to get new name
         d = EntryDialog("Rename sound", "New name:")
         d.entry.value = name
@@ -784,8 +847,8 @@ class SoundsDialog(Dialog):
         def on_entry(evt):
             new_name = d.value
             d.close()
-            if new_name:
-                on_rename(new_name)
+            if new_name and new_name != name:
+                self.app.rename_sound(name, new_name)
 
     def delete_sound(self, name):
         """Delete a sound after confirmation."""
@@ -795,9 +858,7 @@ class SoundsDialog(Dialog):
         @bind(d.ok_button, "click")
         def on_confirm(evt):
             # Delete the sound
-            del self.app.sounds[name]
-            # Update the table
-            self.populate_table()
+            self.app.delete_sound(name)
             d.close()
 
     def show_error(self, message):
@@ -1041,7 +1102,43 @@ class App:
         self.active_module = name
         self.update_ui(update_python_text=True)
 
+    # Sound management methods
+    def get_sound_names(self):
+        """Get a list of all sound names."""
+        return list(self.sounds.keys())
 
+    def get_sound(self, name):
+        """Get a sound by name."""
+        return self.sounds.get(name)
+
+    def add_sound(self, name, data_url):
+        """Add a new sound."""
+        if name not in self.sounds:
+            self.sounds[name] = data_url
+            self.ui.update_sound_dialog()
+            return name
+        else:
+            # This should only be called from our dialog handler where we already confirmed replacement
+            # is desired, so we just replace the existing sound
+            self.sounds[name] = data_url
+            self.ui.update_sound_dialog()
+            return name
+
+    def rename_sound(self, old_name, new_name):
+        """Rename a sound."""
+        assert old_name in self.sounds
+        assert new_name not in self.sounds
+        self.sounds[new_name] = self.sounds[old_name]
+        del self.sounds[old_name]
+        self.ui.update_sound_dialog()
+
+    def delete_sound(self, name):
+        """Delete a sound."""
+        assert name in self.sounds
+        del self.sounds[name]
+        self.ui.update_sound_dialog()
+
+        return False
 
 
 app = App()
