@@ -636,12 +636,12 @@ class SoundsDialog(Dialog):
 
     def init_ui(self):
         """Initialize the dialog UI with a table for sounds and an add button."""
-        container = html.DIV(style="width: 500px;")
+        container = html.DIV(style="width: 600px;")
 
-        # Add button at the top
-        add_button = html.BUTTON("Add sound", style="margin-bottom: 10px;")
-        add_button.bind("click", lambda evt: self.add_sound())
-        container.appendChild(add_button)
+        # Add explanation at the top
+        helptext = "Sounds added here can be accessed in window.SOUNDS in your program."
+        div_help = html.DIV(helptext, style="margin-bottom: 10px;")
+        container.appendChild(div_help)
 
         # Create table for sounds
         self.sound_table = html.TABLE(style="width: 100%; border-collapse: collapse;")
@@ -651,8 +651,13 @@ class SoundsDialog(Dialog):
             html.TH("Duration", style="text-align: right;") +
             html.TH("Actions", style="text-align: center;")
         ))
-
         container.appendChild(self.sound_table)
+
+        # Add button at the bottom
+        add_button = html.BUTTON("Add sound", style="margin-top: 10px;")
+        add_button.bind("click", lambda evt: self.add_sound())
+        container.appendChild(add_button)
+
         self.panel <= container
 
     def populate_table(self):
