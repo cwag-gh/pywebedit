@@ -25,6 +25,9 @@ EXAMPLES = {
         ("pixelperfect", "Perfect pixel-aligned drawing"),
         ("springs", "Spring animation with vectors"),
     ],
+    "Playing sounds": [
+        ("sound", "Local and remote sounds"),
+    ],
     "Using javascript libraries": [
         ("pixi", "Fast 2D graphics (pixi.js)"),
         ("pixi2", "Starfield with wrapped pixi.js"),
