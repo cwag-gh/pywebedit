@@ -97,7 +97,7 @@ def on_play_remote(event):
     def err(evt):
         document['errtext'].innerText = 'Unable to load remote sound'
 
-    audio.bind('loaded', play)
+    audio.bind('loadeddata', play)
     audio.bind('error', err)
 </script>
 </body>
