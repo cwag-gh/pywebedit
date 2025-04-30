@@ -615,7 +615,48 @@ class UI:
             d.close()
 
 
-class SoundsDialog(Dialog):
+class AssetDialog(Dialog):
+    """Dialog for managing assets (sounds, images).
+
+    Shows a list of assets as rows in a table. For each asset in the row, the user can
+    perform several actions (delete, rename, etc).
+
+    Asset size is shown in the row, in kB, as well as other asset specific data.
+    """
+    def __init__(self, app, title, top=100, left=200):
+        super().__init__(title, ok_cancel=False, top=top, left=left)
+        self.app = app
+        self.main_table = None
+        self.init_ui()
+        self.populate_table()
+
+    def init_ui(self):
+        """Initialize the dialog UI with a table for assets and an add button."""
+        container = html.DIV(style="width: 600px;")
+
+        # Add explanation at the top
+        div_help = html.DIV(self.helptext(), style="margin-bottom: 10px;")
+        container.appendChild(div_help)
+
+        # Create table for sounds
+        self.main_table = html.TABLE(style="width: 100%; border-collapse: collapse;")
+        rowtext  = html.TH("Name", style="text-align: left;")
+        rowtext += html.TH("Size", style="text-align: right;")
+        for col in self.additional_columns():
+            rowtext += html.TH(col, style="text-align: right;")
+        rowtext += html.TH("Actions", style="text-align: center;")
+        self.main_table.appendChild(html.TR(rowtext))
+        container.appendChild(self.main_table)
+
+        # Add button at the bottom
+        add_button = html.BUTTON("Add " + self.asset_name(), style="margin-top: 10px;")
+        add_button.bind("click", lambda evt: self.add_asset())
+        container.appendChild(add_button)
+
+        self.panel <= container
+
+
+class SoundsDialog(AssetDialog):
     """Dialog for managing sounds.
 
     Shows a list of sounds as rows in a table. For each sound in the row, the user can:
@@ -629,45 +670,25 @@ class SoundsDialog(Dialog):
     The user can also add a new sound, which will be added to the table.
     """
     def __init__(self, app, top=100, left=200):
-        super().__init__("Manage sounds", ok_cancel=False, top=top, left=left)
-        self.app = app
-        self.sound_table = None
+        super().__init__(app, "Manage sounds", top=top, left=left)
         self.durations = {}  # Cache for sound durations
-        self.init_ui()
         self.populate_table()
 
-    def init_ui(self):
-        """Initialize the dialog UI with a table for sounds and an add button."""
-        container = html.DIV(style="width: 600px;")
+    def asset_name(self):
+        return 'sound'
 
-        # Add explanation at the top
-        helptext = "Sounds added here can be accessed in window.SOUNDS in your program."
-        div_help = html.DIV(helptext, style="margin-bottom: 10px;")
-        container.appendChild(div_help)
+    def helptext(self):
+        return 'Sounds added here can be accessed in window.SOUNDS in your program.'
 
-        # Create table for sounds
-        self.sound_table = html.TABLE(style="width: 100%; border-collapse: collapse;")
-        self.sound_table.appendChild(html.TR(
-            html.TH("Name", style="text-align: left;") +
-            html.TH("Size", style="text-align: right;") +
-            html.TH("Duration", style="text-align: right;") +
-            html.TH("Actions", style="text-align: center;")
-        ))
-        container.appendChild(self.sound_table)
-
-        # Add button at the bottom
-        add_button = html.BUTTON("Add sound", style="margin-top: 10px;")
-        add_button.bind("click", lambda evt: self.add_sound())
-        container.appendChild(add_button)
-
-        self.panel <= container
+    def additional_columns(self) -> list[str]:
+        return ['Duration']
 
     def populate_table(self):
         """Fill the table with sound entries."""
         # Clear existing rows except header
-        if self.sound_table and len(self.sound_table.childNodes) > 1:
-            while len(self.sound_table.childNodes) > 1:
-                self.sound_table.removeChild(self.sound_table.lastChild)
+        if self.main_table and len(self.main_table.childNodes) > 1:
+            while len(self.main_table.childNodes) > 1:
+                self.main_table.removeChild(self.main_table.lastChild)
 
         # Add a row for each sound
         for name in self.app.get_sound_names():
@@ -675,7 +696,7 @@ class SoundsDialog(Dialog):
 
     def add_row(self, name, data_url):
         """Add a row to the table for a sound."""
-        if not self.sound_table:
+        if not self.main_table:
             return
 
         # Calculate size in kB
@@ -685,38 +706,21 @@ class SoundsDialog(Dialog):
 
         # Create row with name, size, and action buttons
         row = html.TR(style="border-bottom: 1px solid #ddd;")
-
-        # Name cell
         name_cell = html.TD(name, style="padding: 5px;")
-
-        # Size cell
         size_cell = html.TD(f"{size_kb} kB", style="text-align: right; padding: 5px;")
-
-        # Duration cell - initially empty, will be populated later
         duration_cell = html.TD("...", style="text-align: right; padding: 5px;")
-
-        # Actions cell with play, rename, and delete buttons
         actions_cell = html.TD(style="text-align: center; padding: 5px;")
-
-        # Play button
         play_button = html.BUTTON("▶", style="margin-right: 5px;")
-        play_button.bind("click", lambda evt, n=name: self.play_sound(n))
-
-        # Rename button
         rename_button = html.BUTTON("✏️", style="margin-right: 5px;")
-        rename_button.bind("click", lambda evt, n=name: self.rename_sound(n))
-
-        # Delete button
         delete_button = html.BUTTON("🗑️")
-        delete_button.bind("click", lambda evt, n=name: self.delete_sound(n))
-
         actions_cell <= play_button + rename_button + delete_button
-
-        # Add cells to row
         row <= name_cell + size_cell + duration_cell + actions_cell
+        self.main_table.appendChild(row)
 
-        # Add row to table
-        self.sound_table.appendChild(row)
+        # Events
+        play_button.bind("click", lambda evt, n=name: self.play_sound(n))
+        rename_button.bind("click", lambda evt, n=name: self.rename_sound(n))
+        delete_button.bind("click", lambda evt, n=name: self.delete_sound(n))
 
         # Calculate duration asynchronously
         self.load_duration(name, data_url, duration_cell)
@@ -745,7 +749,7 @@ class SoundsDialog(Dialog):
         except Exception as e:
             console.log(f'Error playing sound {name}: {e}')
 
-    def add_sound(self):
+    def add_asset(self):
         """Open a file picker to select a sound file.
 
         If name already exists, open additional dialog to either replace or rename."""
