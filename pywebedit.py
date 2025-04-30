@@ -523,7 +523,9 @@ class UI:
         for name in names:
             add_option(select, name, name)
         # Don't add the remove option if there is only one
-        pyfiles = PYFILES[1:] if len(self.app.modules) > 1 else PYFILES[1:-1]
+        pyfiles = PYFILES[1:]
+        if len(self.app.modules) == 1:
+            pyfiles = [(title, val) for title, val in pyfiles if val != '__remove']
         for title, value in pyfiles:
             add_option(select, title, value)
 
