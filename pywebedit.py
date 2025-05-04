@@ -863,6 +863,11 @@ class AssetDialog(Dialog):
     def row_buttons(self, name):
         rename_button = html.BUTTON("✏️", style="margin-right: 5px;")
         delete_button = html.BUTTON("🗑️")
+
+        # Add tooltips
+        rename_button.title = f"Rename {self.asset_type()}"
+        delete_button.title = f"Delete {self.asset_type()}"
+
         rename_button.bind('click', lambda evt, n=name: aio.run(self.rename(n)))
         delete_button.bind('click', lambda evt, n=name: aio.run(self.delete(n)))
         return rename_button + delete_button
@@ -945,6 +950,7 @@ class SoundsDialog(AssetDialog):
         duration_cell = self.cell('...', align='right')
         actions_cell = self.cell('', align='center')
         play_button = html.BUTTON("▶", style="margin-right: 5px;")
+        play_button.title = "Play sound"
         play_button.bind("click", lambda evt, n=name: self.play_sound(n))
 
         actions_cell <= play_button + self.row_buttons(name)
@@ -1031,6 +1037,7 @@ class ImageDialog(AssetDialog):
         thumb = html.IMG(
             src=data_url,
             style='cursor: pointer; width: 50px; height: 50px; object-fit: cover;')
+        thumb.title = "View image"
         thumb_cell <= thumb
         thumb.bind('click', lambda e, n=name: self.open_viewer(n))
         actions_cell = self.cell('', align='center')
