@@ -283,7 +283,6 @@ class AwaitableEntryDialog(EntryDialog):
         document.bind("dialog_close", on_dialog_close)
 
 
-
 ## UI workflow fragment utilities
 
 async def rename_asset(initial_name: str,
@@ -1160,7 +1159,7 @@ class ImageViewDialog(Dialog):
         checker_div = html.DIV(style="display: flex; align-items: center; margin-left: 15px;")
         self.checker_checkbox = html.INPUT(type="checkbox", id="checker_toggle")
         self.checker_checkbox.checked = self.show_checkerboard
-        checker_label = html.LABEL("transparency grid", style="margin-left: 5px; font-size: 14px;")
+        checker_label = html.LABEL("Transparency grid", style="margin-left: 5px; font-size: 14px;")
         checker_label.attrs["for"] = "checker_toggle"
         checker_div <= self.checker_checkbox + checker_label
 
@@ -1180,28 +1179,9 @@ class ImageViewDialog(Dialog):
         # Add all controls
         controls <= zoom_out + zoom_in + reset_zoom + checker_div + self.info_display + prev_btn + next_btn
 
-        # Canvas container with border
-        canvas_container = html.DIV(style="flex: 1; overflow: hidden; border: 1px solid #ccc; position: relative; background-color: #f0f0f0;")
-
-        # Create canvas for image display
-        self.canvas = html.CANVAS(width=900, height=500,
-                                 style="cursor: crosshair; display: block;")
-        canvas_container <= self.canvas
-
-        # Create hidden canvas for accurate pixel reading
-        self.hidden_canvas = html.CANVAS(width=900, height=500,
-                                        style="display: none;")
-        canvas_container <= self.hidden_canvas
-
-        # Explicitly set title attribute to empty to disable tooltip
-        self.canvas.title = ""
-
-        # Add event listeners for canvas
-        self.canvas.bind("wheel", self.on_wheel)
-        self.canvas.bind("mousedown", self.on_mouse_down)
-        self.canvas.bind("mousemove", self.on_mouse_move)
-        self.canvas.bind("mouseup", self.on_mouse_up)
-        self.canvas.bind("mouseleave", self.on_mouse_up)
+        # Canvas container with border - use all remaining vertical space
+        canvas_container = html.DIV(
+            style="flex: 1; overflow: hidden; border: 1px solid #ccc; position: relative; background-color: #f0f0f0;")
 
         # Add components to container
         container <= controls + canvas_container
@@ -1209,8 +1189,36 @@ class ImageViewDialog(Dialog):
         # Add container to dialog
         self.panel <= container
 
-        # Render the image
-        self.load_image()
+        # Create the canvases after container is added to get proper sizing
+        def setup_canvas():
+            # Get the actual container height to properly size the canvas
+            container_height = canvas_container.offsetHeight
+
+            # Create canvas for image display
+            self.canvas = html.CANVAS(width=900, height=container_height,
+                                    style="cursor: crosshair; display: block;")
+            canvas_container <= self.canvas
+
+            # Create hidden canvas for accurate pixel reading
+            self.hidden_canvas = html.CANVAS(width=900, height=container_height,
+                                           style="display: none;")
+            canvas_container <= self.hidden_canvas
+
+            # Explicitly set title attribute to empty to disable tooltip
+            self.canvas.title = ""
+
+            # Add event listeners for canvas
+            self.canvas.bind("wheel", self.on_wheel)
+            self.canvas.bind("mousedown", self.on_mouse_down)
+            self.canvas.bind("mousemove", self.on_mouse_move)
+            self.canvas.bind("mouseup", self.on_mouse_up)
+            self.canvas.bind("mouseleave", self.on_mouse_up)
+
+            # Render the image
+            self.load_image()
+
+        # Slight delay to ensure DOM is updated and we can get accurate container size
+        window.setTimeout(setup_canvas, 0)
 
     def load_image(self):
         """Load the current image and render it to the canvas."""
