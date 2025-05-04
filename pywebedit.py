@@ -1468,11 +1468,11 @@ class ImageViewDialog(Dialog):
                     alpha_percent = window.Math.round(a / 255 * 100)
 
                     # Update info display with alpha
-                    self.info_display.textContent = f"Position: {img_x},{img_y} | Color: {color_hex} | Alpha: {alpha_percent}%"
+                    self.info_display.textContent = f"Pos: {img_x},{img_y} | Color: {color_hex} | Alpha: {alpha_percent}%"
                 else:
-                    self.info_display.textContent = f"Position: {img_x},{img_y} | Color: [no data]"
+                    self.info_display.textContent = f"Pos: {img_x},{img_y} | Color: [no data]"
             else:
-                self.info_display.textContent = "Position: outside image | Color: -"
+                self.info_display.textContent = "Pos: outside image | Color: -"
 
     def navigate_images(self, direction):
         """Navigate to next or previous image."""
