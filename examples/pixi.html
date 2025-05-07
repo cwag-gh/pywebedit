@@ -41,6 +41,12 @@ class __ErrorReporter:
         self.errdiv.textContent += ("\n" + msg)
 sys.stderr = __ErrorReporter()
 
+# Load sound resouces
+window.SOUNDS = {}
+
+# Load image resources
+window.IMAGES = {'bunny':'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABoAAAAlCAYAAABcZvm2AAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAWNJREFUeNrsV8sNwjAMbUqBBWACxB2pQ8AKcGALTsAJuDEFB1gBhuDAuWICmICPQh01pXWdJqEFcaglRGRbfonjPLuMc+5QwhjLGEJfZusjxZOL9akZKye9G98vPMfvsAx4qBfKwfzBL9s6uUHpI6U/u7+BKGkNb/H6umtk7MczF0HyfKS4zo/k/4AgTV8DOizrqX8oECgC+MGa8lGJp9sJDiAB8nyqYoglvJOPbP97IqoATGxWVZeXJlMQwYHA3piF8wJIblOVNBBxe3TPMLoHIKtxrbS7AAbBrA4Y5NaPAXf8LjN6wKZ0RaZOnlAFZnuXInVR4FTE6eYp0olPhhshtXsAwY3PquoAJNkIY33U7HTs7hYBwV24ItUKqDwgKF3VzAZ6k8HF+B1BMF8xRJbeJoqMXHZAAQ1kwoluURCdzepEugGEImBrIADB7I4lyfbJLlw92FKE6b5hVd+ktv4vAQYASMWxvlAAvcsAAAAASUVORK5CYII='}
+
 # Load modules - use runPythonSource as it is synchronous
 for module in []:
     __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
@@ -68,8 +74,11 @@ async def main():
     container = PIXI.Container.new()
     app.stage.addChild(container)
     
-    # Load the bunny texture
-    texture = await PIXI.Assets.load('https://pixijs.com/assets/bunny.png')
+    # Load the bunny texture, using a remote address
+    # texture = await PIXI.Assets.load('https://pixijs.com/assets/bunny.png')
+
+    # Load the bunny texture, using the local image database
+    texture = await PIXI.Assets.load(window.IMAGES['bunny'])
     
     # Create a 5x5 grid of bunnies in the container
     for i in range(25):
