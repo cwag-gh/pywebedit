@@ -45,8 +45,6 @@ See the live version [here](https://robotfantastic.org/pywebedit/).
 
 For export:
 - list libraries, with checkbox
-- images
-- sounds
 - Button: export as zip
   - all checked above will export as local files
 - Button: export as html
