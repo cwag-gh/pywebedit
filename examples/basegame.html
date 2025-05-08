@@ -365,7 +365,8 @@ def draw_sprite(name: str, x, y, scale=1.0, rotation_deg=None):
 <script type="text/python" id="__pwe_pixisound">
 """Very lightweight wrapper around pixi-sound.js.
 
-Note that you cannot immediately play sounds - you wait until after a user interaction.
+Note that you cannot immediately play sounds - 
+you wait until after a user interaction.
 """
 
 from browser import window
@@ -375,12 +376,19 @@ def add(name: str, path_to_sound_file):
     window.PIXI.sound.add(name, path_to_sound_file)
 
 
-def play(name: str, spritename: str | None = None):
+def play(name: str, spritename: str | None = None, loop=False):
     window.PIXI.sound.context.paused = False # Always try to enable
+    options = {'loop': loop}
     if spritename is not None:
-        window.PIXI.sound.play(name, spritename)
+        options['spritename'] = spritename
+    window.PIXI.sound.play(name, options)
+
+
+def stop(name: str, spritename: str | None = None):
+    if spritename is not None:
+        window.PIXI.sound.stop(name, spritename)
     else:
-        window.PIXI.sound.play(name)
+        window.PIXI.sound.stop(name)
 
 
 def addsprites(name, path_to_sound_file, name_to_start_end_map):
