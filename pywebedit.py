@@ -1,10 +1,12 @@
 # Main python code
 
+import base64
 from dataclasses import dataclass
 from typing import Callable
+
 from browser import document, window, bind, aio, console, html
 from browser.widgets.dialog import InfoDialog, Dialog, EntryDialog
-import base64
+
 
 BRYTHON_VERSION = '3.13.1'
 PYWEBEDIT_VERSION = '0.2.0'
@@ -61,6 +63,20 @@ HELP = f"""
 </div>
 """.strip()
 
+
+def wrapscript(s):
+    """Safely wrap string in script tags."""
+    assert '>' in s
+    return '<' + 'script' + s + '<' + '/script>'
+
+# A little fix to get brython to load properly when it is embedded as a script element
+SCRIPT_LOCAL_BRYTHON_SHIM = """
+%script% type="text/javascript">
+globalThis.__BRYTHON__ = {};
+globalThis.__BRYTHON__.brython_path = document.location.href.substring(0, document.location.href.lastIndexOf('/') + 1);
+%endscript%
+"""
+
 # Template for generated final page. Do not include script tags, which
 # screws up the html in python in html. Use alternate replacement
 # syntax (other than format()) to avoid syntax conflicts. Note the
@@ -70,11 +86,8 @@ PAGE_TEMPLATE = """
 <html>
 <head>
 <meta charset="utf-8">
-%script% type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@%brython_version%/brython.min.js">%endscript%
-%script%> typeof brython === "undefined" && document.write('%script% src="brython.min.js">\\x3C/script>')%endscript%
 
-%script% type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@%brython_version%/brython_stdlib.js">%endscript%
-%script%> typeof __BRYTHON__.use_VFS === "undefined" && document.write('%script% src="brython_stdlib.js">\\x3C/script>')%endscript%
+%libraries%
 
 %script% type="text/javascript">
 function __brython_pre_then_code() {
@@ -129,6 +142,21 @@ MODULE_TEMPLATE = """
 %endscript%
 """.strip()
 
+
+# Dict of name: javascript library info tuples (desc, var, url), where:
+# - name is the name of the javascript library without the js
+# - var is the name of a global variable that will have been
+#   defined after the javascript library has loaded.
+# TODO: add these as a rightclick menu
+JSLIBS = {
+    'brython': ('Core Brython functionality', '__BRYTHON__', f'https://cdn.jsdelivr.net/npm/brython@{BRYTHON_VERSION}/brython.min.js'),
+    'brython_stdlib': ('Brython standard library', '__BRYTHON__.use_VFS', f'https://cdn.jsdelivr.net/npm/brython@{BRYTHON_VERSION}/brython_stdlib.js'),
+    'pixi': ('Fast 2D WebGL renderer', 'PIXI', 'https://unpkg.com/pixi.js@8.9.2/dist/pixi.min.js'),
+    'pixi-sound': ('Sound extension for pixi.js', 'PIXI.sound', 'https://unpkg.com/@pixi/sound@6.0.1/dist/pixi-sound.js'),
+    'three': ('3D graphics library', 'THREE', 'https://cdnjs.cloudflare.com/ajax/libs/three.js/100/three.min.js'),
+}
+
+
 PYFILES = [('main', 'main'),
            (None, None),
            ('New python module', '__new'),
@@ -177,6 +205,66 @@ def parse_str_str_dict(s):
     return d
 
 
+def encode_js_for_html(js_content, chunk_size=1023):
+    """
+    Encode JavaScript content to base64 data URL and format as HTML script tag.
+
+    Rationale:
+    1. Encode to UTF-8 bytes first to properly handle unicode characters
+    2. Process in chunks (multiple of 3) to work around Brython's b64encode limitations
+    3. Base64 encode each chunk separately, strip intermediate padding, concatenate
+    4. Wrap at 76 characters (RFC 2045 standard for base64 line length)
+    5. Output as ready-to-use HTML script tag with data URL
+    """
+    # Convert unicode string to UTF-8 bytes
+    utf8_bytes = js_content.encode('utf-8')
+
+    # Ensure chunk_size is multiple of 3 for proper base64 encoding
+    chunk_size = chunk_size - (chunk_size % 3)
+    if chunk_size == 0:
+        chunk_size = 3
+
+    # Encode in chunks to avoid Brython b64encode bugs
+    encoded_parts = []
+    for i in range(0, len(utf8_bytes), chunk_size):
+        chunk = utf8_bytes[i:i + chunk_size]
+        encoded_chunk = base64.b64encode(chunk).decode('ascii')
+
+        # Strip padding from intermediate chunks (we'll add it back at the end)
+        if i + chunk_size < len(utf8_bytes):
+            encoded_chunk = encoded_chunk.rstrip('=')
+
+        encoded_parts.append(encoded_chunk)
+
+    # Concatenate all encoded chunks
+    encoded_str = ''.join(encoded_parts)
+
+    # Manually wrap at 76 characters for readability
+    wrapped_lines = []
+    for i in range(0, len(encoded_str), 76):
+        wrapped_lines.append(encoded_str[i:i + 76])
+
+    # Format as HTML script tag with data URL
+    script_tag = '<' + 'script' + ' src="data:text/javascript;base64,' + \
+        '\n'.join(wrapped_lines) + '"' + '></' + 'script>'
+
+    return script_tag
+
+
+def urlname(url):
+    return url.split('/')[-1]
+
+
+def create_script_loader(libname):
+    """Returns a script tag that loads the library, with a fallback to load a local copy."""
+    url = JSLIBS[libname][2]
+    var = JSLIBS[libname][1]
+    jslibname = urlname(url)
+    s = f'%script% type="text/javascript" src="{url}">%endscript%\n'
+    s += f'%script%> typeof {var} === "undefined" && document.write("%script% src="{jslibname}">\\x3C/script>")%endscript%'
+    return s
+
+
 ## Brython html utilities
 
 def add_option(select, title, value):
@@ -213,10 +301,11 @@ def inputdialog(title, prompt, onok, value=None):
             onok(value)
 
 
-async def pick_file_to_open():
+async def pick_file_to_open(**file_picker_args):
     try:
-        file_handles = await window.showOpenFilePicker({
-            'id': PICKER_ID}) # Use same id between pickers to save folder
+        args = {'id': PICKER_ID} # Use same id between pickers to save folder
+        args.update(file_picker_args)
+        file_handles = await window.showOpenFilePicker(args)
         if len(file_handles) == 0:
             return None
     except AttributeError:
@@ -257,6 +346,14 @@ class AwaitableDialog(Dialog):
         document.bind('dialog_close', on_dialog_close)
         if hasattr(self, 'ok_button'):
             self.ok_button.bind('click', on_ok_button)
+
+
+async def amsg(title, text, top=None, left=None):
+    d = AwaitableDialog(title, ok_cancel=True)
+    d.panel <= text
+    event = await aio.event(d, 'ok', 'cancel')
+    d.close()
+    return event.type == 'ok'
 
 
 class AwaitableEntryDialog(EntryDialog):
@@ -467,7 +564,7 @@ class UI:
             return
         await self.app.open_file(file_handle)
 
-    async def on_save(self, force_picker=False):
+    async def on_save(self, force_picker=False, libs_to_bundle=None):
         handle = self.app.file_handle
         if force_picker or not self.app.has_file():
             name = 'myprogram.html'
@@ -486,7 +583,8 @@ class UI:
                 # User cancelled
                 return
         await self.app.save_file(handle, self.contents_html(),
-                                 self.contents_python(), self.viewinfo_python())
+                                 self.contents_python(), self.viewinfo_python(),
+                                 libs_to_bundle=libs_to_bundle)
 
     async def on_save_as(self):
         await self.on_save(force_picker=True)
@@ -722,62 +820,36 @@ class UI:
 
     def export_dialog(self, evt):
         "Display a dialog with checkboxes for selecting JavaScript libraries to include in the export."
-
-        # Create the dialog
-        d = Dialog("Select libraries to include", ok_cancel=("Export", "Cancel"), top=100, left=200)
-
-        # Define available libraries
-        # Format: (library_name, default_checked, description, is_required)
-        libraries = [
-            ("brython.min.js", True, "Core Brython functionality (required)", True),
-            ("brython_stdlib.js", True, "Brython standard library", False),
-            ("pixi.min.js", False, "2D WebGL renderer", False),
-            ("pixi-sound.js", False, "Sound extension for Pixi.js", False),
-            ("three.min.js", False, "3D graphics library", False),
-            # Add more libraries as needed
-        ]
-
-        # Create a container div for the library list
-        container = html.DIV(style="max-height: 300px; overflow-y: auto;")
-
-        # Add description
-        description = html.P("Select which JavaScript libraries to include in your exported file:",
+        d = Dialog("Export HTML with bundled libraries", ok_cancel=("Export", "Cancel"), top=100, left=200)
+        container = html.DIV(style="max-height: 500px; overflow-y: auto;")
+        container <= html.P("Select which JavaScript libraries to bundle in your exported file.")
+        container <= html.P("If you bundle everything, then your file can run completely offline.")
+        container <= html.P("If you are running this exporter offline, "
+                            "you will need to manually find the selected libraries on your computer.",
                              style="margin-bottom: 15px;")
-        container <= description
+
+        # TODO: scan current code and see if any of the library names exist; then use those
+        # to add the check
 
         # Dictionary to keep track of checkboxes
         checkboxes = {}
 
-        # Add each library as a checkbox option
-        for lib_name, default_checked, lib_desc, is_required in libraries:
-            # Create a div for each library
+        for lib_name in JSLIBS:
+            desc, globalvar, url = JSLIBS[lib_name]
+
             lib_div = html.DIV(style="margin-bottom: 10px; display: flex; align-items: center;")
 
-            # Create the checkbox
             checkbox = html.INPUT(type="checkbox", id=f"lib_{lib_name.replace('.', '_')}")
-            checkbox.checked = default_checked
-            checkbox.disabled = is_required  # Disable checkbox if library is required
+            # TODO: remember the ones that have been checked
 
-            # Label with library name and description
-            label_text = f"{lib_name}"
-            if lib_desc:
-                label_text += f" - {lib_desc}"
+            label_text = f"{lib_name} - {desc}"
             label = html.LABEL(label_text, style="margin-left: 8px; flex: 1;")
             label.attrs["for"] = checkbox.id
 
-            # Add elements to the div
             lib_div <= checkbox + label
-
-            # Add the div to the container
             container <= lib_div
 
-            # Store the checkbox reference
-            checkboxes[lib_name] = checkbox
-
-        # Add note about required libraries
-        note = html.P("Note: Required libraries cannot be deselected.",
-                      style="font-style: italic; margin-top: 15px; font-size: 0.9em;")
-        container <= note
+            checkboxes[lib_name] = checkbox             # Store the checkbox reference
 
         # Add the container to the dialog
         d.panel <= container
@@ -787,10 +859,34 @@ class UI:
         def ok_click(evt):
             # Get the list of selected libraries
             selected_libs = [lib_name for lib_name, checkbox in checkboxes.items()
-                            if checkbox.checked]
-
-            # Close the dialog
+                             if checkbox.checked]
             d.close()
+            aio.run(self.retrieve_libraries_and_export_html(selected_libs))
+
+    async def retrieve_libraries_and_export_html(self, libs_to_bundle):
+        """Make sure libraries are cached, then export."""
+        # TODO: try to get all the libraries in parallel
+        for libname in libs_to_bundle:
+            if not await self.app.fetchlib(libname):
+                # Was not able to get it through internet access;
+                # need to get it through direct loading.
+                # TODO: change title to find file.
+                _, _, url = JSLIBS[libname]
+                filename = url[(url.rfind('/')+1):]
+                ok = await amsg('Info', f'Unable to load {filename} from internet. '
+                                f'Opening file browser to find local copy of {filename}.')
+                if not ok:
+                    msg('Info', 'Cancelling HTML export')
+                    return
+                file_handle_of_lib = await pick_file_to_open(
+                    suggestedName=filename,
+                    types=[{'description': 'JavaScript files',
+                            'accept': {'text/js': ['.js']}}])
+                if file_handle_of_lib is None:
+                    msg('Info', 'Cancelling HTML export')
+                    return
+                await self.app.fileloadlib(libname, file_handle_of_lib) # This should succeed
+        await self.on_save(force_picker=True, libs_to_bundle=libs_to_bundle)
 
 
 class AssetDialog(Dialog):
@@ -810,7 +906,7 @@ class AssetDialog(Dialog):
 
     def init_ui(self):
         """Initialize the dialog UI with a table for assets and an add button."""
-        container = html.DIV(style="width: 600px;")
+        container = html.DIV(style="width: 600px; max-height: 550px; overflow-y: auto;")
 
         # Add explanation at the top
         div_help = html.DIV(self.helptext(), style="margin-bottom: 10px;")
@@ -1522,6 +1618,7 @@ class App:
         self.modules_viewinfo: dict[str, ViewInfo] = {}
         self.sounds: dict[str, str] = {} # Name -> base64 encoded sound as a data URL
         self.images: dict[str, str] = {} # Name -> base64 encoded image as a data URL
+        self.libraries: dict[str, str] = {} # Name -> contents of javascript library (cache)
         self.active_module = 'main'
         self.orig_modules = dict(self.modules)
         self.orig_body = INITIAL_HTML
@@ -1669,9 +1766,69 @@ class App:
                                    self.modules_viewinfo[self.active_module], quiet=True))
         self.ui.run_html_in_new_window(html)
 
-    def build_html(self, html_body, python_code):
-        """Build the full html text, inserting the user editable sections into the template."""
+    async def fetchlib(self, libname):
+        """Attempt to fetch and cache javascript library.
+
+        Start with CDN (and the browser cache). If that doesn't work,
+        try to fetch a local copy (which will fail if offline due to
+        CORS).
+
+        Returns True if successfully able to fetch and cache the library.
+        """
+        desc, globalvar, url = JSLIBS[libname]
+        localurl = url[(url.rfind('/')+1):]
+        for url_to_try in [url, localurl]:
+            response = await aio.get(url, cache=True)
+            # TODO: fix correct syntax here
+            if response.status == 200:
+                self.libraries[libname] = response.data
+                return True
+        return False
+
+    async def fileloadlib(self, libname, lib_file_handle):
+        """Loads library from a file handle."""
+        f = await lib_file_handle.getFile()
+        self.libraries[libname] = await f.text()
+        return True
+
+    def is_lib_cached(self, libname):
+        return libname in self.libraries
+
+    def build_html(self, html_body, python_code, libs_to_bundle=None):
+        """Build the full html text, inserting the user editable sections into the template.
+
+        Optionally inlines complete javascript libraries for complete standaloneness.
+        """
         self.modules[self.active_module] = python_code
+
+        console.log('Building html with libs_to_bundle:', libs_to_bundle)
+        if libs_to_bundle is None:
+            libs_to_bundle = []
+
+        # Handle library bundling - need to respect the order for bython
+        for lib in libs_to_bundle:
+            assert lib in self.libraries
+        libtxt = ''
+
+        # Brython has a special case - it needs to be loaded first with an additional shim
+        if 'brython' in libs_to_bundle:
+            libtxt += SCRIPT_LOCAL_BRYTHON_SHIM
+            libtxt += encode_js_for_html(self.libraries['brython']) + '\n'
+            libs_to_bundle.remove('brython')
+        else:
+            libtxt += create_script_loader('brython') + '\n'
+
+        # We also have to load the standard library no matter what, as our error handler currently relies on it
+        if 'brython_stdlib' in libs_to_bundle:
+            libtxt += encode_js_for_html(self.libraries['brython_stdlib']) + '\n'
+            libs_to_bundle.remove('brython_stdlib')
+        else:
+            libtxt += create_script_loader('brython_stdlib') + '\n'
+
+        libtxt += '\n'.join(encode_js_for_html(self.libraries[lib]) + '\n'
+                            for lib in libs_to_bundle)
+
+        # Convert modules to script blocks
         module_texts = []
         for module_name, module_code in self.modules.items():
             if module_name == 'main':
@@ -1685,10 +1842,13 @@ class App:
                 m = m.replace('%' + key + '%', value)
             module_texts.append(m)
 
+        # Save embedded sounds and images
         sounds = "{" + ",\n".join(f"'{key}':'{val}'" for key,val in self.sounds.items()) + "}"
         images = "{" + ",\n".join(f"'{key}':'{val}'" for key,val in self.images.items()) + "}"
 
-        tagmap = {'brython_version': BRYTHON_VERSION,
+        # Note this is order dependent
+        tagmap = {'libraries':       libtxt,
+                  'brython_version': BRYTHON_VERSION,
                   'html_body':       html_body,
                   'python_code':     self.modules['main'],
                   'script':          '<' + 'script',
@@ -1700,14 +1860,16 @@ class App:
         p = PAGE_TEMPLATE
         for key, value in tagmap.items():
             p = p.replace('%' + key + '%', value)
+
         return p
 
-    async def save_file(self, file_handle, html_body, python_code, python_viewinfo, quiet=False):
+    async def save_file(self, file_handle, html_body, python_code, python_viewinfo,
+                        libs_to_bundle=None, quiet=False):
         self.modules[self.active_module] = python_code
         self.modules_viewinfo[self.active_module] = python_viewinfo
         self.file_handle = file_handle
         self.file_name = file_handle.name
-        full_html = self.build_html(html_body, python_code)
+        full_html = self.build_html(html_body, python_code, libs_to_bundle)
         writable = await file_handle.createWritable()
         await writable.write(full_html)
         await writable.close()
