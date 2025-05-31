@@ -1,6 +1,9 @@
+#    https://cdn.jsdelivr.net/npm/brython@3.13.1/brython.min.js \
+#    https://cdn.jsdelivr.net/npm/brython@3.13.1/brython_stdlib.js \
+
 JS_DEPS = \
-    https://cdn.jsdelivr.net/npm/brython@3.13.1/brython.min.js \
-    https://cdn.jsdelivr.net/npm/brython@3.13.1/brython_stdlib.js \
+    https://raw.githack.com/brython-dev/brython/master/www/src/brython.js \
+    https://raw.githack.com/brython-dev/brython/master/www/src/brython_stdlib.js \
     https://unpkg.com/pixi.js@8.9.2/dist/pixi.min.js \
     https://unpkg.com/@pixi/sound@6.0.1/dist/pixi-sound.js \
     https://cdnjs.cloudflare.com/ajax/libs/three.js/100/three.min.js
@@ -10,11 +13,13 @@ CSS_DEPS = \
 
 # Extract just the filenames for local use
 JS_FILES = $(notdir $(JS_DEPS))
+JS_FILES_NO_BRYTHON = $(filter-out brython.js, $(notdir $(JS_DEPS))) brython.min.js
 CSS_FILES = $(notdir $(CSS_DEPS))
-ALL_FILES = $(JS_FILES) $(CSS_FILES)
+# Allow option to retrieve brython.js, but bundle brython.min.js
+ALL_FILES = $(JS_FILES_NO_BRYTHON) $(CSS_FILES)
 
 # Full paths in dist for dependencies
-JS_DIST_FILES = $(addprefix dist/,$(JS_FILES))
+JS_DIST_FILES = $(addprefix dist/,$(JS_FILES_NO_BRYTHON))
 CSS_DIST_FILES = $(addprefix dist/,$(CSS_FILES))
 ALL_DIST_FILES = $(JS_DIST_FILES) $(CSS_DIST_FILES)
 
@@ -46,6 +51,11 @@ dist/examples.js: examples.py
 dist/%.js:
 	mkdir -p dist
 	cd dist && curl -O $(filter %/$(notdir $@),$(JS_DEPS))
+
+# Specific rule for minifying brython if you are getting the development version.
+# Install terser with npm install terser -g
+dist/brython.min.js: dist/brython.js
+	terser dist/brython.js --compress -o dist/brython.min.js
 
 # Generic rule for downloading CSS files
 dist/%.css:
