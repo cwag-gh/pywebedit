@@ -240,9 +240,10 @@ def encode_js_for_html(js_content, chunk_size=1023):
     encoded_str = ''.join(encoded_parts)
 
     # Manually wrap at 76 characters for readability
+    col_wrap = 76
     wrapped_lines = []
-    for i in range(0, len(encoded_str), 76):
-        wrapped_lines.append(encoded_str[i:i + 76])
+    for i in range(0, len(encoded_str), col_wrap):
+        wrapped_lines.append(encoded_str[i:i + col_wrap])
 
     # Format as HTML script tag with data URL
     script_tag = '<' + 'script' + ' src="data:text/javascript;base64,' + \
