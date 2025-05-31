@@ -376,19 +376,12 @@ def add(name: str, path_to_sound_file):
     window.PIXI.sound.add(name, path_to_sound_file)
 
 
-def play(name: str, spritename: str | None = None, loop=False):
+def play(name: str, spritename: str | None = None):
     window.PIXI.sound.context.paused = False # Always try to enable
-    options = {'loop': loop}
     if spritename is not None:
-        options['spritename'] = spritename
-    window.PIXI.sound.play(name, options)
-
-
-def stop(name: str, spritename: str | None = None):
-    if spritename is not None:
-        window.PIXI.sound.stop(name, spritename)
+        window.PIXI.sound.play(name, spritename)
     else:
-        window.PIXI.sound.stop(name)
+        window.PIXI.sound.play(name)
 
 
 def addsprites(name, path_to_sound_file, name_to_start_end_map):
