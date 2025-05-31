@@ -26,16 +26,20 @@ clean:
 	rm -rf dist
 
 dist/pywebedit.html: pywebedit.py pywebedit.html_template
+	mkdir -p dist
 	python utils/tagreplace.py pywebedit.html_template "<script type=\"text/python\">" "</script>" pywebedit.py -o $@
 
 dist/dev.html: pywebedit.py dev.html_template
+	mkdir -p dist
 	python utils/tagreplace.py dev.html_template "<script type=\"text/python\">" "</script>" pywebedit.py -o $@
 
 dist/pywebeditor.min.js: pywebeditor/package.json pywebeditor/editor.mjs pywebeditor/rollup.config.js
+	mkdir -p dist
 	cd pywebeditor && npm run build
 	ls -al $@
 
 dist/examples.js: examples.py
+	mkdir -p dist
 	python examples.py $@
 
 # Generic rule for downloading JS files
