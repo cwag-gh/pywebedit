@@ -39,6 +39,9 @@ See the live version [here](https://robotfantastic.org/pywebedit/).
   load images and javascript, but not other html files, sounds, etc.
 - Mixing tabs and spaces results in confusing errors. For now, we
   replace all tabs with spaces on Run.
+- Some CDNs are better than others for this project, in that they
+  allow fetching resources from Origin: Null (like when you are
+  running / testing locally). This is nice, so prefer them (unpkg).
 
 
 ## TODO
