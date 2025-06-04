@@ -55,6 +55,7 @@ def bundle_examples_to_javascript(output_file: str):
 
     for category, examples_list in EXAMPLES.items():
         examples_in_category = []
+        print(f'  Category: {category}')
         for example_id, help_text in examples_list:
             file_path = os.path.join(examples_dir, f"{example_id}.html")
             try:
@@ -71,6 +72,7 @@ def bundle_examples_to_javascript(output_file: str):
                     "help": help_text,
                     "content": base64_content
                 })
+                print(f'    Encoded {example_id}')
                 num_examples += 1
             except FileNotFoundError:
                 print(f"Warning: Example file {file_path} in category {category} not found")
