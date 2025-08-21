@@ -31,12 +31,12 @@ See the live version [here](https://robotfantastic.org/pywebedit/).
   [urfdvw's Brython Editor](https://github.com/urfdvw/Brython-Editor)
 - Use a fallback so that it can run using local copies of the main
   javascript libraries (both the editor and the generated webpages)
+- Embed images and sound files to be truly portable, even offline
+  (where you can't load non-image files)
 
 
 ## Implementation notes
 
-- Working around the local-loading rules is a pain. You can locally
-  load images and javascript, but not other html files, sounds, etc.
 - Mixing tabs and spaces results in confusing errors. For now, we
   replace all tabs with spaces on Run.
 - Some CDNs are better than others for this project, in that they
@@ -46,23 +46,14 @@ See the live version [here](https://robotfantastic.org/pywebedit/).
 
 ## TODO
 
-For export:
-- list libraries, with checkbox
-- Button: export as zip
-  - all checked above will export as local files
-- Button: export as html
-  - all check above will be encoded into the html
-  - Option - with compression?
-
-
+- Increase speed of export
+  - Test out speed of non-chuncked encode approach
+- Improve speed of loading
+  - Check out Blob approach instead of directly embedding script
 - Maybe "use" statements that load scripts in a useful way?
-- Auto collate examples directory (and headers) into examples.js
-  - What to do about sounds and images?
 - Support export to github
 - support save/load from google drive?
 - Disable other buttons when help window is up
-- DONE Fix game template screen sizing
-- DONE Add all examples to offline build, get them working
 - Add console
 - Fix keypresses on Windows
 - Fix issue where mismatched tags in the body section will screw up
@@ -71,6 +62,7 @@ For export:
   we want
 - Add [indentation markers](https://github.com/replit/codemirror-indentation-markers)
 - Don't add the stdlib if the python doesn't require it
+  - No, can't do this yet, as error handling depends on stdlib
 - Consider using brython's browser.widgets.menu to make more complex
   menu interfaces
 - Add all examples from Brython website?
