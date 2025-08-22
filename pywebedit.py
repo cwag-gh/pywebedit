@@ -696,11 +696,8 @@ class UI:
                                self.viewinfo_python())
 
     def on_example_select(self, evt):
-        # Since we really use this as a menu, automatically return to first choice.
-        # Don't want to have to deal with situation where an example has been
-        # modified - do we change the example choice or not?
+        # Load the selected example and track it
         self.warn_if_modified(onok=self.app.load_example(evt.target.value))
-        self.set_example_choice('')
 
     def on_help(self, evt):
         return msg('Help', HELP, top=100, left=200)
@@ -1618,6 +1615,7 @@ class App:
     def __init__(self):
         self.file_handle = None
         self.file_name = None # Save file name separate
+        self.current_example = None  # Track which example is currently loaded
         self.modules: dict[str, str] = {'main': INITIAL_PYTHON}
         self.modules_viewinfo: dict[str, ViewInfo] = {}
         self.sounds: dict[str, str] = {} # Name -> base64 encoded sound as a data URL
@@ -1655,8 +1653,7 @@ class App:
     def has_file(self):
         return self.file_handle != None
 
-    def update_ui(self, update_python_text=False):
-        # Not complete - we don't keep track of active example
+    def update_ui(self, update_python_text=False, keep_example_selected=False):
         if self.file_name is not None:
             self.ui.set_loaded_file(self.file_name)
         self.ui.set_module_list(self.modules.keys())
@@ -1666,6 +1663,10 @@ class App:
             viewinfo = self.modules_viewinfo.get(self.active_module, None)
             self.ui.set_contents_python(self.modules[self.active_module], viewinfo)
             # console.log(f'Updated ui with viewinfo: {viewinfo}')
+        if not keep_example_selected:
+            if self.current_example is not None:
+                self.current_example = None
+                self.ui.set_example_choice('')
 
     async def load_example(self, name):
         # Assumes overwrite check has already been completed
@@ -1678,8 +1679,10 @@ class App:
                         if self.load_html(base64.b64decode(example['content']).decode('utf-8')):
                             self.file_handle = None
                             self.file_name = f'{name}.html'
+                            self.current_example = name  # Track the current example
                             self.reset_save_on_run()
                             self.ui.set_loaded_file(f'{name}.html')
+                            self.ui.set_example_choice(name)  # Update dropdown to show current example
                         else:
                             err(f'Parsing error when loading example {name}.')
                         return
@@ -1908,7 +1911,7 @@ class App:
         await writable.write(current_python_code)
         await writable.close()
         console.log(f'Exported module {self.active_module} as {file_handle.name}')
-        self.update_ui(update_python_text=True)
+        self.update_ui(update_python_text=True, keep_example_selected=True)
 
     def rename_module(self, new_name):
         assert new_name not in self.modules
@@ -1931,7 +1934,7 @@ class App:
         self.modules[self.active_module] = current_python_code
         self.modules_viewinfo[self.active_module] = python_viewinfo
         self.active_module = name
-        self.update_ui(update_python_text=True)
+        self.update_ui(update_python_text=True, keep_example_selected=True)
 
     # Sound management methods
     def get_sound_names(self):
