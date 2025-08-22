@@ -1,5 +1,5 @@
-#    https://cdn.jsdelivr.net/npm/brython@3.13.1/brython.min.js \
-#    https://cdn.jsdelivr.net/npm/brython@3.13.1/brython_stdlib.js \
+#    https://cdn.jsdelivr.net/npm/brython@3.13.2/brython.min.js \
+#    https://cdn.jsdelivr.net/npm/brython@3.13.2/brython_stdlib.js \
 
 JS_DEPS = \
     https://raw.githack.com/brython-dev/brython/master/www/src/brython.js \
