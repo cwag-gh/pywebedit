@@ -1,0 +1,261 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+
+<script type="text/javascript" src="https://raw.githack.com/brython-dev/brython/master/www/src/brython.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__ === "undefined" && document.write("<script src=\"brython.js\">\x3C/script>")</script>
+<script type="text/javascript" src="https://raw.githack.com/brython-dev/brython/master/www/src/brython_stdlib.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write("<script src=\"brython_stdlib.js\">\x3C/script>")</script>
+
+
+<script type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+}
+</script>
+</head>
+
+<body onload="__brython_pre_then_code()">
+<!-- Import pixi, with fallback to a local copy -->
+<script
+src="https://unpkg.com/pixi.js@8.9.2/dist/pixi.min.js">
+</script>
+<script>typeof PIXI === "undefined" && 
+    document.write('<script src="pixi.min.js">\x3C/script>')</script>
+
+<style>
+/* Set the body to fill the screen */
+body { 
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #333;
+}
+
+/* Create a floating panel to show debug information */
+#debugpanel {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    font: 11px monospace;
+    color: #8f8;
+    background: rgba(0,0,0,.7);
+    padding: 10px;
+    z-index: 1000;
+    pointer-events: none;
+}
+</style>
+
+<div id="debugpanel"></div>
+<script type="text/python" id="brythonpre">
+from browser import document, window
+
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\n" + msg)
+sys.stderr = __ErrorReporter()
+
+# Load sound resouces
+window.SOUNDS = {}
+
+# Load image resources
+window.IMAGES = {'bunny':'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABoAAAAlCAYAAABcZvm2AAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAWNJREFUeNrsV8sNwjAMbUqBBWACxB2pQ8AKcGALTsAJuDEFB1gBhuDAuWICmICPQh01pXWdJqEFcaglRGRbfonjPLuMc+5QwhjLGEJfZusjxZOL9akZKye9G98vPMfvsAx4qBfKwfzBL9s6uUHpI6U/u7+BKGkNb/H6umtk7MczF0HyfKS4zo/k/4AgTV8DOizrqX8oECgC+MGa8lGJp9sJDiAB8nyqYoglvJOPbP97IqoATGxWVZeXJlMQwYHA3piF8wJIblOVNBBxe3TPMLoHIKtxrbS7AAbBrA4Y5NaPAXf8LjN6wKZ0RaZOnlAFZnuXInVR4FTE6eYp0olPhhshtXsAwY3PquoAJNkIY33U7HTs7hYBwV24ItUKqDwgKF3VzAZ6k8HF+B1BMF8xRJbeJoqMXHZAAQ1kwoluURCdzepEugGEImBrIADB7I4lyfbJLlw92FKE6b5hVd+ktv4vAQYASMWxvlAAvcsAAAAASUVORK5CYII=',
+'bunny2':'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABoAAAAlCAYAAABcZvm2AAAABHNCSVQICAgIfAhkiAAAAWhJREFUSInVl8tRwzAQhn8RJxWQCjxU4CKgBXJII8AppBEOpIVQhCrIuIKkAgyzHLA0tqyVVkIw5p/JxLOS8+mxryjwIo9NZczhjQDouKvQ1OPh9aYbvkPn1+XkRWeOVcWAAADX9+/2+XJYTcZ1S7h97IJzjK5CoJKaH0i3vnsvBHp7Xo6+j7sK+PY06p8nczgFvS5VTa1Yr5vfHf0J6O7pI2ssGVRCIlDIMaROk+Ra7jGleKZNkNIfMLmNi5uBi484FQDabxfilcWkW4Kb1debjrxL1ydCc+OP5VgGMDBX3qMzO+RgMXlcXrEpyAdzCyEwXX0PSSt8QzW1GhVCa++LXSy7i+KIgwBg7VmgEsoDsVdbGkTp1XbmR/dbIN0S27NdDitR4yKOI92SjRnXLlFSmfhJy5UGOvlBkpwobyAZSGzMSLSjWAOy3y6CpQUQ7GiQjdnPw8sngPDO5hVH/woUEsH/HzVr/hfV1oJAvhJfjwAAAABJRU5ErkJggg==',
+'bird1-down-left':'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAQCAYAAAAWGF8bAAABPklEQVQ4T2NkQAPR9nz/YUJLD35iRJcnxIdrOLJpEtig6b01DDuvsjG4a/9iQDZwa6wg3CKQOu/F77FaBhfcuaofrmHR1HqwQ9ANBBmCbDA2QzFs8TPj+8/LCfEYsoEeHh5wC3fs2IEzKIg2UEREBGygiYkJA14D0cMGW6Afk0lhOHv+MlyKJBfGOiBiefEBSCwjexfEJ8pAWHJhQgsEkKHoBor+OIYz9cC1I6c/kGqQwf+QEspbTiuwIcLfjzFw8/7CMPDrZzawGNhAmDd//WFkYGFGmPLnL4QPMwyfgSA5kKEoBiK7CNkJhFwHU4ti4MdvDAyw9AdSAHMdut+QvQvzJkgNSPz7F6gLQQLICRpniEM14pOHRwrIQJBCZFfi0ojNlTAxlERCrqGwCAEZijVPwgzG5zWQnIQYZvIBAEl8hz5Mnph2AAAAAElFTkSuQmCC',
+'bird2-down-left':'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAQCAYAAAAWGF8bAAABO0lEQVQ4T2NkQAPR9nz/YUJLD35iRJcnxIdrOLJpEtig6b01DDuvsjG4a/9iQDEwbxvcIrChk7ywWgYX3LmqH65h0dR6sB4MA0GGIBuMxVAMW/zM+P7zckI8hmygh4cH3MIdO3bgDAqiDRQREQEbaGJiwoDfQPSwwRLq1dz7Gc6evwyXIcmFsQ6IWF58ABLLyN4F8YkyEJZcmNACAWQouoGiP47hTD1w7cjpD6QaZPA/pITyltMKbIjw92MM3Ly/MAz8+pkNLAY2EObNX38YGViYEab8+QvhwwzDZyBIDmQoioHILkJ2AiHXwdSiGPjxGwMDLP2BFMBch+43ZO/CvAlSAxL//gXqQpAAcoLGGeJQjfjk4ZECMhCkENmVuDRicyVMDCWRkGsoLEJAhmLNkzCD8XkNJCchhpl8AE79hD5bST3gAAAAAElFTkSuQmCC'}
+
+# Load modules - use runPythonSource as it is synchronous
+for module in []:
+    __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
+
+# Now run main code
+window.brython({'debug': 1, 'ids': ["pythoncode"]})
+</script>
+
+
+
+<script type="text/python" id="pythoncode">
+# Investigation of things that affect pixel perfect rendering
+#
+# Quick summary of anti-alias effects for pixel perfect sprites:
+# - Set canvas image-rendering: pixelated. Fundamentally important.
+# - Set "antialias": False in app.init. Not required. Actually, may
+#   want this to be set to True if you want rotations to look smooth
+#   yet keeping orthogonal sprites looking sharp
+# - texture.source.scaleMode = 'nearest' - Critical if you want to
+#   scale textures at all
+# - Integer scale between app.renderer (logical canvas) and actual
+#   canvas size (canvas.style.width, etc.) - Turns out not fully needed.
+#   This is probably an effect of a high resolution display, so maybe
+#   you get non uniform motion. Or, you might not notice.
+
+from browser import document, window, aio, bind
+import math
+import time
+
+PIXI = window.PIXI
+app = None
+container = None
+c2 = None
+
+@bind(document, 'keypress')
+def on_key_press(e):
+    if e.key == 'd':
+        # Toggle visibility of debug panel
+        panel = document["debugpanel"]
+        panel.style.display = "none" if panel.style.display != "none" else "block"
+    elif e.key == 'f':
+        # Toggle fullscreen
+        if document.fullscreenElement:
+            document.exitFullscreen()
+        else:
+            document.documentElement.requestFullscreen()
+
+@bind(window, 'resize')
+def resize(evt=None):
+    """Resize the canvas to fill the screen while maintaining aspect ratio.
+    """
+    global app, container, c2
+
+    # Get the window dimensions
+    window_width = window.innerWidth
+    window_height = window.innerHeight
+
+    # Set a target width, height (for the logical canvas)
+    target_width, target_height = 400, 300
+    # Note that you could just set the logical canvas to the
+    # window dimensions and be done with it
+
+    # Determine a scaling factor so that one dimension fits the screen
+    scale = min(window_width  / target_width,
+                window_height / target_height)
+
+    # Optionally, restrict the scale to an integer to get full pixel
+    # perfect across a range of conditions (usually when your DPI is low,
+    # and non-integer scaling leads to size varying sprites when scaled)
+    view_integer_scale = False
+    if view_integer_scale:
+        scale = int(scale)
+
+    # Calculate the centered position
+    new_width = round(target_width * scale)
+    new_height = round(target_height * scale)
+    left = math.floor((window_width - new_width) / 2)
+    top = math.floor((window_height - new_height) / 2)
+
+    # Set the canvas display size (CSS pixels)
+    app.canvas.style.position = 'absolute';
+    app.canvas.style.width = f'{new_width}px'
+    app.canvas.style.height = f'{new_height}px'
+    app.canvas.style.left = f'{left}px'
+    app.canvas.style.top = f'{top}px'
+
+    # Update the renderer size (in logical pixels)
+    app.renderer.resize(target_width, target_height)
+
+    document['debugpanel'].innerHTML = '<br>'.join([
+        f'Target = {target_width},{target_height} px',
+        f'Window = {window_width},{window_height} px',
+        f'Scale = {scale:.4f}',
+        ''
+        '[d] to toggle this debug output',
+        '[f] for fullscreen'
+    ])
+    
+    # Move container to the center
+    container.x = app.screen.width / 2
+    container.y = app.screen.height / 2
+    
+
+async def main():
+    global app, container, c2
+    
+    # Create a new application
+    app = PIXI.Application.new()
+    # Initialize the application
+    await app.init({"background": '#1099bb', 
+                    #"resizeTo": window,
+                    #"autoDensity": True,
+                    #"resolution": 1,
+                    "resolution": window.devicePixelRatio or 1,
+                    "antialias": True, # This does something when rotating
+                   }) 
+    # Append the application canvas to the document body
+    document.body.appendChild(app.canvas)
+
+    # Set the canvas style to pixelated - this is key to get
+    # full pixel perfect rendering
+    app.canvas.style.imageRendering = 'pixelated'
+
+    # NOTE: there is a bug in pixi.js 8 where you cannot set the 
+    # default scale mode of textures. So, must do it manually on
+    # each texture source.
+    # window.PIXI.TextureStyle.defaultOptions.scaleMode = 'nearest'
+    # window.PIXI.TextureSource.defaultOptions.scaleMode = 'nearest'
+
+    # Load a texture, using the local image database
+    #smooth_texture = await PIXI.Assets.load(window.IMAGES['bunny'])
+    smooth_texture = await PIXI.Assets.load(window.IMAGES['bird1-down-left'])
+    #smooth_texture = await PIXI.Assets.load('https://pixijs.com/assets/bunny.png')
+    
+    # Load another texture. Note, if you are going to set a different
+    # scale mode, you must use images that are actually distinct.
+    # PIXI does some sort of hashing on the image, so if you load two
+    # textures that have the same bitwise representation, there seems to
+    # be only one source saved in memory.
+    #sharp_texture = await PIXI.Assets.load(window.IMAGES['bunny2'])
+    sharp_texture = await PIXI.Assets.load(window.IMAGES['bird2-down-left'])
+    sharp_texture.source.scaleMode = 'nearest'
+
+    # Create and add a container to the stage
+    container = PIXI.Container.new()
+    app.stage.addChild(container)
+
+    # Add a smoothed sprite to the container, scaled by 4x
+    smooth_sprite = PIXI.Sprite.new(smooth_texture)
+    smooth_sprite.x = 0
+    smooth_sprite.y = 0
+    smooth_sprite.scale = 4
+    container.addChild(smooth_sprite)
+
+    # Center sprite in local container coordinates
+    container.pivot.x = container.width / 2
+    container.pivot.y = container.height / 2
+
+    # A second container
+    c2 = PIXI.Container.new()
+    app.stage.addChild(c2)
+
+    # Add a sharp sprite - scale both sprite and container
+    sharp_sprite = PIXI.Sprite.new(sharp_texture)
+    sharp_sprite.x = 150
+    sharp_sprite.y = 30
+    sharp_sprite.scale = 2
+    c2.addChild(sharp_sprite)
+    c2.scale = 2
+
+    def animate(ticker):
+        container.rotation -= 0.01 * ticker.deltaTime
+        c2.x = math.sin(time.perf_counter()) * 100.0
+
+    # Uncomment this to see the sprites moving
+    app.ticker.add(animate)
+
+    resize() 
+
+
+# Start the async main function
+aio.run(main())
+</script>
+</body>
+</html>
