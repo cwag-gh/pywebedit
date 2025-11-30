@@ -28,16 +28,20 @@ EXAMPLES = {
     "Playing sounds": [
         ("sound", "Local and remote sounds"),
     ],
-    "Using javascript libraries": [
-        ("pixi", "Fast 2D graphics (pixi.js)"),
-        ("pixi2", "Starfield with wrapped pixi.js"),
-        ("pixi_sound", "Starfield with sound (pixi-sound.js)"),
-        ("three", "3D spinning cube (three.js)"),
-    ],
-    "Games and interaction": [
+    "Games with canvas": [
         ("breakout", "Brick breaking"),
         ("lightcycles", "Lightcycles"),
-        ("basegame", "Template for pixi+sound games"),
+    ],
+    "Using javascript libraries": [
+        ("pixi", "Fast 2D graphics (pixi.js)"),
+        ("three", "3D spinning cube (three.js)"),
+    ],
+    "Games with pixi.js": [
+        ("pixi", "Basic example"),
+        ("pixi2", "Starfield with wrapped pixi.js"),
+        ("pixi_sound", "Starfield with sound (pixi-sound.js)"),
+        ("pixi-sprite", "True pixel-perfect sprites"),
+        ("basegame", "Pygame-like template for pixi+sound games"),
     ],
 }
 
