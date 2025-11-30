@@ -2,11 +2,12 @@
 <html>
 <head>
 <meta charset="utf-8">
-<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.1/brython.min.js"></script>
-<script> typeof brython === "undefined" && document.write('<script src="brython.min.js">\x3C/script>')</script>
 
-<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.1/brython_stdlib.js"></script>
-<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write('<script src="brython_stdlib.js">\x3C/script>')</script>
+<script type="text/javascript" src="https://raw.githack.com/brython-dev/brython/master/www/src/brython.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__ === "undefined" && document.write("<script src=\"brython.js\">\x3C/script>")</script>
+<script type="text/javascript" src="https://raw.githack.com/brython-dev/brython/master/www/src/brython_stdlib.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write("<script src=\"brython_stdlib.js\">\x3C/script>")</script>
+
 
 <script type="text/javascript">
 function __brython_pre_then_code() {
@@ -18,7 +19,7 @@ function __brython_pre_then_code() {
 <body onload="__brython_pre_then_code()">
 <!-- Import pixi, with fallback to a local copy -->
 <script
-src="https://pixijs.download/v8.9.1/pixi.min.js">
+src="https://pixijs.download/v8.9.2/pixi.min.js">
 </script>
 <script>typeof PIXI === "undefined" && 
     document.write('<script src="pixi.min.js">\x3C/script>')</script>
