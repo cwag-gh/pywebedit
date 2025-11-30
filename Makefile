@@ -1,9 +1,14 @@
+# Brython sources:
 #    https://cdn.jsdelivr.net/npm/brython@3.13.2/brython.min.js \
 #    https://cdn.jsdelivr.net/npm/brython@3.13.2/brython_stdlib.js \
+#    https://cdnjs.cloudflare.com/ajax/libs/brython/3.14.0/brython.min.js \
+#    https://cdnjs.cloudflare.com/ajax/libs/brython/3.14.0/brython_stdlib.min.js \
+#    https://raw.githack.com/brython-dev/brython/master/www/src/brython.js \
+#    https://raw.githack.com/brython-dev/brython/master/www/src/brython_stdlib.js \
 
 JS_DEPS = \
     https://raw.githack.com/brython-dev/brython/master/www/src/brython.js \
-    https://raw.githack.com/brython-dev/brython/master/www/src/brython_stdlib.js \
+    https://cdnjs.cloudflare.com/ajax/libs/brython/3.14.0/brython_stdlib.min.js \
     https://unpkg.com/pixi.js@8.9.2/dist/pixi.min.js \
     https://unpkg.com/@pixi/sound@6.0.1/dist/pixi-sound.js \
     https://cdnjs.cloudflare.com/ajax/libs/three.js/100/three.min.js

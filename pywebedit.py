@@ -8,8 +8,8 @@ from browser import document, window, bind, aio, console, html
 from browser.widgets.dialog import InfoDialog, Dialog, EntryDialog
 
 
-BRYTHON_VERSION = '3.13.2+dev'
-PYWEBEDIT_VERSION = '0.2.1'
+BRYTHON_VERSION = '3.14.0'
+PYWEBEDIT_VERSION = '0.2.2'
 
 
 INITIAL_HTML = """
@@ -149,11 +149,12 @@ MODULE_TEMPLATE = """
 #   defined after the javascript library has loaded.
 # TODO: add these as a rightclick menu
 JSLIBS = {
-#    'brython': ('Core Brython functionality', '__BRYTHON__', f'https://cdn.jsdelivr.net/npm/brython@{BRYTHON_VERSION}/brython.min.js'),
-#    'brython_stdlib': ('Brython standard library', '__BRYTHON__.use_VFS', f'https://cdn.jsdelivr.net/npm/brython@{BRYTHON_VERSION}/brython_stdlib.js'),
+    # Fixed verion, minified
+    'brython': ('Core Brython functionality', '__BRYTHON__', f'https://cdn.jsdelivr.net/npm/brython@{BRYTHON_VERSION}/brython.min.js'),
+    'brython_stdlib': ('Brython standard library', '__BRYTHON__.use_VFS', f'https://cdn.jsdelivr.net/npm/brython@{BRYTHON_VERSION}/brython_stdlib.js'),
     # Latest development verion, non-minified
-    'brython': ('Core Brython functionality', '__BRYTHON__', f'https://raw.githack.com/brython-dev/brython/master/www/src/brython.js'),
-    'brython_stdlib': ('Brython standard library', '__BRYTHON__.use_VFS', f'https://raw.githack.com/brython-dev/brython/master/www/src/brython_stdlib.js'),
+#    'brython': ('Core Brython functionality', '__BRYTHON__', f'https://raw.githack.com/brython-dev/brython/master/www/src/brython.js'),
+#    'brython_stdlib': ('Brython standard library', '__BRYTHON__.use_VFS', f'https://raw.githack.com/brython-dev/brython/master/www/src/brython_stdlib.js'),
     'pixi': ('Fast 2D WebGL renderer', 'PIXI', 'https://unpkg.com/pixi.js@8.9.2/dist/pixi.min.js'),
     'pixi-sound': ('Sound extension for pixi.js', 'PIXI.sound', 'https://unpkg.com/@pixi/sound@6.0.1/dist/pixi-sound.js'),
     'three': ('3D graphics library', 'THREE', 'https://cdnjs.cloudflare.com/ajax/libs/three.js/100/three.min.js'),
