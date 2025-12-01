@@ -41,7 +41,7 @@ EXAMPLES = {
         ("pixi2", "Starfield with wrapped pixi.js"),
         ("pixi_sound", "Starfield with sound (pixi-sound.js)"),
         ("pixi-sprite", "True pixel-perfect sprites"),
-        ("basegame", "Pygame-like template for pixi+sound games"),
+        ("basepygame", "Pygame-like template for pixi+sound games"),
     ],
 }
 
