@@ -8,8 +8,8 @@ from browser import document, window, bind, aio, console, html
 from browser.widgets.dialog import InfoDialog, Dialog, EntryDialog
 
 
-BRYTHON_VERSION = '3.14.0'
-PYWEBEDIT_VERSION = '0.2.2'
+BRYTHON_VERSION = '3.13.2'
+PYWEBEDIT_VERSION = '0.2.3'
 
 
 INITIAL_HTML = """

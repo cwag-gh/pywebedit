@@ -1,4 +1,8 @@
+# Note: Brython 3.14 introduced a regression, something to do with lazy imports
+# that prevents local loading (turns imports into AJAX calls maybe)
+
 # Brython sources:
+#    https://raw.githack.com/brython-dev/brython/master/www/src/brython.js \
 #    https://cdn.jsdelivr.net/npm/brython@3.13.2/brython.min.js \
 #    https://cdn.jsdelivr.net/npm/brython@3.13.2/brython_stdlib.js \
 #    https://cdnjs.cloudflare.com/ajax/libs/brython/3.14.0/brython.min.js \
@@ -7,8 +11,8 @@
 #    https://raw.githack.com/brython-dev/brython/master/www/src/brython_stdlib.js \
 
 JS_DEPS = \
-    https://raw.githack.com/brython-dev/brython/master/www/src/brython.js \
-    https://cdnjs.cloudflare.com/ajax/libs/brython/3.14.0/brython_stdlib.min.js \
+    https://cdn.jsdelivr.net/npm/brython@3.13.2/brython.min.js \
+    https://cdn.jsdelivr.net/npm/brython@3.13.2/brython_stdlib.js \
     https://unpkg.com/pixi.js@8.9.2/dist/pixi.min.js \
     https://unpkg.com/@pixi/sound@6.0.1/dist/pixi-sound.js \
     https://cdnjs.cloudflare.com/ajax/libs/three.js/100/three.min.js
@@ -57,10 +61,10 @@ dist/%.js:
 	mkdir -p dist
 	cd dist && curl -O $(filter %/$(notdir $@),$(JS_DEPS))
 
-# Specific rule for minifying brython if you are getting the development version.
-# Install terser with npm install terser -g
-dist/brython.min.js: dist/brython.js
-	terser dist/brython.js --compress -o dist/brython.min.js
+# # Specific rule for minifying brython if you are getting the development version.
+# # Install terser with npm install terser -g
+# dist/brython.min.js: dist/brython.js
+#  	terser dist/brython.js --compress -o dist/brython.min.js
 
 # Generic rule for downloading CSS files
 dist/%.css:
