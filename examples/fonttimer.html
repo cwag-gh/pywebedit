@@ -1,0 +1,124 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.2/brython.min.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__ === "undefined" && document.write("<script src=\"brython.min.js\">\x3C/script>")</script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.2/brython_stdlib.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write("<script src=\"brython_stdlib.js\">\x3C/script>")</script>
+
+
+<script type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+}
+</script>
+</head>
+
+<body onload="__brython_pre_then_code()">
+<!-- This shows how to use custom fonts in your webpage.
+You can use it in the page itself or use it in a canvas element.
+
+Unfortunately, this (currently) relies on web access.
+-->
+<link href="https://fonts.cdnfonts.com/css/orbitron" rel="stylesheet">
+
+<div align="center">
+    <div style="font-family: orbitron; font-size: 20px; font-weight: bold;">
+        The time is:
+    </div>
+<canvas id="canvas"
+        width="800"
+        height="600"></canvas>
+</div>
+
+<script type="text/python" id="brythonpre">
+from browser import document, window
+
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\n" + msg)
+sys.stderr = __ErrorReporter()
+
+# Load sound resouces
+window.SOUNDS = {}
+
+# Load image resources
+window.IMAGES = {}
+
+# Load modules - use runPythonSource as it is synchronous
+for module in []:
+    __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
+
+# Now run main code
+window.brython({'debug': 1, 'ids': ["pythoncode"]})
+</script>
+
+
+
+<script type="text/python" id="pythoncode">
+from datetime import datetime
+from browser import document, window, aio
+
+CTX = document['canvas'].getContext('2d')
+HEIGHT = document['canvas'].height
+WIDTH = document['canvas'].width
+
+
+def clear():
+    "Clear the entire canvas"
+    canvas = CTX.canvas
+    CTX.clearRect(0, 0, canvas.width, canvas.height)
+
+
+def set_background(color='black'):
+    canvas = CTX.canvas
+    CTX.fillStyle = color
+    CTX.fillRect(0, 0, canvas.width, canvas.height)
+
+
+def draw_text(text, x, y, color='black', font_size=12, font_family='Arial',
+              centered=True, bold=False):
+    "Draw text at (x,y)"
+    CTX.fillStyle = color
+    CTX.font = f'{"bold" if bold else ""} {font_size}px {font_family}'
+    if centered:
+        CTX.textAlign = 'center'
+        CTX.textBaseline = 'middle'
+    else:
+        CTX.textAlign = 'left'
+        CTX.textBaseline = 'alphabetic'
+    CTX.fillText(text, x, y)
+
+
+async def main():
+    while True:
+        clear()
+        now = datetime.now()
+        sdate = now.strftime("%Y-%m-%d")
+        stime = now.strftime("%H:%M:%S")
+        draw_text(sdate, WIDTH/2, HEIGHT/2 - 60,
+                  font_size=60,
+                  font_family='orbitron')
+        draw_text(stime, WIDTH/2, HEIGHT/2 + 60,
+                  font_size=150,
+                  font_family='orbitron')
+        await aio.sleep(0.1)
+
+
+# Start font load early by drawing something blank
+draw_text(' ', 100, 100, font_family="orbitron")
+# Then, start the run only after fonts are loaded
+document.fonts.ready.then(aio.run(main()))
+
+</script>
+</body>
+</html>

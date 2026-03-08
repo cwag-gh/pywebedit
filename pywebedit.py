@@ -9,7 +9,7 @@ from browser.widgets.dialog import InfoDialog, Dialog, EntryDialog
 
 
 BRYTHON_VERSION = '3.13.2'
-PYWEBEDIT_VERSION = '0.2.3'
+PYWEBEDIT_VERSION = '0.2.4'
 
 
 INITIAL_HTML = """

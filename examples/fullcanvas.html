@@ -1,0 +1,143 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.2/brython.min.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__ === "undefined" && document.write("<script src=\"brython.min.js\">\x3C/script>")</script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.2/brython_stdlib.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write("<script src=\"brython_stdlib.js\">\x3C/script>")</script>
+
+
+<script type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+}
+</script>
+</head>
+
+<body onload="__brython_pre_then_code()">
+<!-- 
+Minimal styling to get canvas to fill screen (in resize function).
+
+Add:
+
+canvas { display: block; image-rendering: pixelated; }
+
+in between the style tags if you want the drawing to be pixel perfect
+(like for sprites).
+-->
+<style>
+    * { margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; }    
+</style>
+   
+
+<canvas id="gameCanvas" /canvas>
+
+
+<script type="text/python" id="brythonpre">
+from browser import document, window
+
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\n" + msg)
+sys.stderr = __ErrorReporter()
+
+# Load sound resouces
+window.SOUNDS = {}
+
+# Load image resources
+window.IMAGES = {}
+
+# Load modules - use runPythonSource as it is synchronous
+for module in []:
+    __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
+
+# Now run main code
+window.brython({'debug': 1, 'ids': ["pythoncode"]})
+</script>
+
+
+
+<script type="text/python" id="pythoncode">
+# Now, not focusing on getting pixel perfect scaling, just
+# a canvas that fills the screen.
+
+import math
+from browser import document, window
+
+canvas = document.getElementById("gameCanvas")
+ctx = canvas.getContext("2d")
+
+                                                                
+def resize_canvas(_):
+    # Set the canvas size (the thing on the screen) to the 
+    # size of the actual window so that we take up the full screen.
+    canvas.style.width = str(window.innerWidth) + 'px'
+    canvas.style.height = str(window.innerHeight) + 'px'
+
+    # Now, if we just want 1:1 drawing, make the render canvas
+    # size the same size too. No scaling, but might be slow on large screens.
+    # Weirdly, you can't just write:
+    #
+    # canvas.width = window.innerWidth
+    # canvas.height = window.innerHeight
+    #
+    # due to weird interaction between brython, javascript, and
+    # the DOM - need to use setAttribute instead. Later, you can
+    # still read from canvas.width and canvas.height.
+    canvas.setAttribute('width', window.innerWidth)
+    canvas.setAttribute('height', window.innerHeight)
+
+
+def draw_rect(x, y, width, height, color):
+    ctx.fillStyle = color
+    ctx.fillRect(
+        round(x),
+        round(y),
+        round(width),
+        round(height))
+
+
+def game_loop(now):
+    draw(now)
+    window.requestAnimationFrame(game_loop)
+
+    
+def draw(t):
+    draw_rect(0, 0, canvas.width, canvas.height, "#000")
+
+    # Draw a square that should be a square no matter the screen size,
+    # But scales size with screen width.
+    ref_width = canvas.width / 3
+    draw_rect(
+        canvas.width / 2 - ref_width / 2,
+        canvas.height / 2 - ref_width / 2 + canvas.height / 5 * math.sin(t / 500),
+        ref_width,
+        ref_width,  
+        "#33a")
+
+    # Now draw a square that has a fixed size no matter the screen
+    # width or height.
+    draw_rect(
+        canvas.width/2 + 0.4 * canvas.width * math.cos(t / 1000),
+        canvas.height/2 + 0.4 * canvas.height * math.sin(t / 1000),
+        16,
+        16,
+        "#0fc")
+    
+
+resize_canvas(0)
+window.addEventListener("resize", resize_canvas)
+game_loop(0)
+</script>
+</body>
+</html>

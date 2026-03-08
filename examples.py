@@ -20,9 +20,11 @@ EXAMPLES = {
     ],
     "Drawing and animating": [
         ("clock", "Analog clock"),
+        ("fonttimer", "Using custom fonts"),
         ("barcode", "Generate barcodes"),
         ("pythagoras", "Animated geometry proof"),
         ("pixelperfect", "Perfect pixel-aligned drawing"),
+        ("fullcanvas", "Full screen canvas drawing"),
         ("springs", "Spring animation with vectors"),
     ],
     "Playing sounds": [
@@ -33,7 +35,6 @@ EXAMPLES = {
         ("lightcycles", "Lightcycles"),
     ],
     "Using javascript libraries": [
-        ("pixi", "Fast 2D graphics (pixi.js)"),
         ("three", "3D spinning cube (three.js)"),
     ],
     "Games with pixi.js": [
