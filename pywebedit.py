@@ -293,19 +293,6 @@ def erropen():
     return err('This browser does not support opening and saving local files. Try Chrome.')
 
 
-def inputdialog(title, prompt, onok, value=None):
-    d = EntryDialog(title, prompt)
-    if value is not None:
-        d.entry.value = value
-
-    @bind(d, 'entry')
-    def entry(ev):
-        value = d.value
-        d.close()
-        if value:
-            onok(value)
-
-
 async def pick_file_to_open(**file_picker_args):
     try:
         args = {'id': PICKER_ID} # Use same id between pickers to save folder
@@ -391,13 +378,14 @@ async def rename_asset(initial_name: str,
                        asset_type: str,
                        name_is_valid: Callable[[str], str | None],
                        name_is_unused: Callable[[str], bool]) -> str | None:
-    """Rename workflow. Ensures picked name is valid and unused."""
+    """Prompt for a valid, unused name, re-asking on conflict. A falsy
+    initial_name makes this a 'new name' prompt rather than a rename."""
     errmsg = ''
     spacer = '<br><br>'
     name = initial_name
     while True:
-        d = EntryDialog(f'Rename {asset_type} {initial_name}',
-                        f'{errmsg}New name:')
+        title = f'Rename {asset_type} {initial_name}' if initial_name else f'New {asset_type}'
+        d = EntryDialog(title, f'{errmsg}New name:')
         d.entry.value = name
         event = await aio.event(d, 'entry', 'cancel')
         name = d.value
@@ -603,8 +591,14 @@ class UI:
             return 'Module names must only include letters, numbers, and underscores.'
         return None
 
-    def _check_newname(self, name):
-        if self._check_valid_module_name(name) is None:
+    def _module_name_is_unused(self, name):
+        return name not in self.app.modules
+
+    async def on_new(self):
+        name = await rename_asset('', 'module',
+                                  self._check_valid_module_name,
+                                  self._module_name_is_unused)
+        if name is not None:
             self.app.new_module(name, self.contents_python(), self.viewinfo_python())
 
     async def on_rename(self):
@@ -614,7 +608,7 @@ class UI:
         name = await rename_asset(self.app.active_module,
                                   'module',
                                   self._check_valid_module_name,
-                                  lambda name: name in self.app.modules)
+                                  self._module_name_is_unused)
         if name is not None:
             self.app.rename_module(name)
 
@@ -622,7 +616,7 @@ class UI:
         name, file_handle = await load_asset(
             'module',
             self._check_valid_module_name,
-            lambda name: name in self.app.modules)
+            self._module_name_is_unused)
         if not name:
             return
         await self.app.import_module(name, file_handle, self.contents_python())
@@ -648,7 +642,7 @@ class UI:
         if module.startswith('__'):
             self.set_active_module(self.app.active_module)
         if module == '__new':
-            inputdialog('New module', 'Module name:', self._check_newname)
+            aio.run(self.on_new())
         elif module == '__import':
             aio.run(self.on_import())
         elif module == '__export':

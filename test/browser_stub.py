@@ -20,6 +20,10 @@ import os
 import sys
 import types
 
+# The canonical minimal pywebedit program, shared across the test tiers.
+HELLO_BODY = "<h1 id='text'></h1>"
+HELLO_PY = "from browser import document\ndocument['text'].textContent = 'Hello, World!'"
+
 
 class _Any:
     """A permissive black-hole object.

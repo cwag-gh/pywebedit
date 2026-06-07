@@ -56,6 +56,8 @@ that actually matter for this project:
 3. **Export is standalone & offline** – the exported HTML, with Brython inlined
    as base64, runs from disk with the network fully cut off and makes *zero*
    external requests.
+4. **Sounds & images** – a loaded sound is embedded, survives save/reopen, and
+   plays; a loaded image is embedded and opens in the canvas previewer.
 
 The browser tests all run in a fully **offline** context, so they also prove
 the CDN-with-local-fallback wiring works with no internet (Run included).

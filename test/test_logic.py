@@ -17,6 +17,7 @@ Run directly:  python test/test_logic.py
 Or via:        python test/run.py --logic-only
 """
 
+import asyncio
 import base64
 import contextlib
 import importlib.util
@@ -27,16 +28,13 @@ import re
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from browser_stub import import_pywebedit, REPO_ROOT  # noqa: E402
+from browser_stub import HELLO_BODY, HELLO_PY, REPO_ROOT, import_pywebedit  # noqa: E402
 
 pwe = import_pywebedit()
-
-
-HELLO_BODY = "<h1 id='text'></h1>"
-HELLO_PY = "from browser import document\ndocument['text'].textContent = 'Hello, World!'"
 
 
 def _decode_data_url_scripts(html):
@@ -45,6 +43,51 @@ def _decode_data_url_scripts(html):
     for b64 in re.findall(r'src="data:text/javascript;base64,([A-Za-z0-9+/=\n]+)"', html):
         out.append(base64.b64decode(b64.replace("\n", "")).decode("utf-8"))
     return out
+
+
+@contextlib.contextmanager
+def _stub_dialogs(typed=(), events=None, picked_name=None):
+    """Drive pywebedit's async name workflows without a browser.
+
+    Replaces the dialog/picker/aio layer with stubs that script the user:
+      typed       - successive values "entered" into EntryDialogs (default '')
+      events      - successive aio.event outcomes 'entry'/'cancel' (default 'entry')
+      picked_name - filename returned by pick_file_to_open, for file-based flows
+    Yields {'prompts': [...]}, each entry the title + message a dialog showed.
+    """
+    prompts = []
+    typed_it = iter(typed)
+    events_it = iter(events) if events is not None else None
+
+    class _Dialog:
+        def __init__(self, title, message=None, **kwargs):
+            prompts.append(f"{title} {message or ''}")
+            self.entry = SimpleNamespace(value="")
+
+        @property
+        def value(self):
+            return next(typed_it, "")
+
+        def close(self):
+            pass
+
+    class _Aio:
+        async def event(self, dialog, *types):
+            return SimpleNamespace(type=next(events_it) if events_it else "entry")
+
+    async def _pick(*args, **kwargs):
+        return SimpleNamespace(name=picked_name)
+
+    saved = {n: getattr(pwe, n) for n in ("EntryDialog", "AwaitableEntryDialog", "aio", "pick_file_to_open")}
+    try:
+        pwe.EntryDialog = pwe.AwaitableEntryDialog = _Dialog
+        pwe.aio = _Aio()
+        if picked_name is not None:
+            pwe.pick_file_to_open = _pick
+        yield {"prompts": prompts}
+    finally:
+        for name, value in saved.items():
+            setattr(pwe, name, value)
 
 
 class StringHelpers(unittest.TestCase):
@@ -149,6 +192,149 @@ class RoundTrip(unittest.TestCase):
         self.assertEqual(modules["main"].strip(), HELLO_PY.strip())
         self.assertEqual(sounds, {})
         self.assertEqual(images, {})
+
+
+class Assets(unittest.TestCase):
+    """Sound/image management at the model level (the browser-free half of
+    'load a sound or image'). The actual play/preview UI is covered by the
+    Tier 2 tests ``test_load_and_play_sound`` / ``test_load_and_preview_image``.
+    """
+
+    def test_add_rename_delete(self):
+        app = pwe.App()
+        app.add_sound("laser", "data:audio/wav;base64,UklGRg==")
+        app.add_image("hero", "data:image/png;base64,iVBORw0K")
+
+        self.assertEqual(app.get_sound("laser"), "data:audio/wav;base64,UklGRg==")
+        self.assertEqual(app.get_sound_names(), ["laser"])
+        self.assertEqual(app.get_image("hero"), "data:image/png;base64,iVBORw0K")
+        self.assertEqual(app.get_image_names(), ["hero"])
+
+        # Adding under an existing name replaces it.
+        app.add_sound("laser", "data:audio/wav;base64,QQ==")
+        self.assertEqual(app.get_sound("laser"), "data:audio/wav;base64,QQ==")
+        self.assertEqual(app.get_sound_names(), ["laser"])
+
+        app.rename_sound("laser", "zap")
+        self.assertEqual(app.get_sound_names(), ["zap"])
+        self.assertIsNone(app.get_sound("laser"))
+
+        app.delete_sound("zap")
+        app.delete_image("hero")
+        self.assertEqual(app.get_sound_names(), [])
+        self.assertEqual(app.get_image_names(), [])
+
+    def test_loaded_assets_survive_save_load(self):
+        """A loaded sound/image must be embedded in the saved file and come
+        back intact when that file is re-opened."""
+        app = pwe.App()
+        app.add_sound("laser", "data:audio/mpeg;base64,QUFBQQ==")
+        app.add_image("bunny", "data:image/png;base64,Qk1Q")
+        html = app.build_html(HELLO_BODY, HELLO_PY)
+
+        _, _, sounds, images = pwe.App().split_html(html)
+        self.assertEqual(sounds, {"laser": "data:audio/mpeg;base64,QUFBQQ=="})
+        self.assertEqual(images, {"bunny": "data:image/png;base64,Qk1Q"})
+
+    def _check_rename_collision(self, dialog_cls, add, names, get):
+        """Renaming an asset onto an existing name must re-prompt, not accept
+        the duplicate (which would trip rename_sound/rename_image's assert)."""
+        app = pwe.App()
+        add(app, "alpha", "data:x;base64,AAAA")
+        add(app, "beta", "data:x;base64,BBBB")
+        dialog = dialog_cls(app)
+        with _stub_dialogs(typed=["beta", "gamma"]) as state:  # taken, then free
+            asyncio.run(dialog.rename("alpha"))
+
+        self.assertEqual(set(names(app)), {"beta", "gamma"})  # alpha -> gamma
+        self.assertIsNone(get(app, "alpha"))
+        self.assertTrue(
+            any("already exists" in p.lower() for p in state["prompts"]),
+            f"expected an inline duplicate-name message; saw {state['prompts']}",
+        )
+
+    def test_rename_sound_collision_reprompts(self):
+        self._check_rename_collision(
+            pwe.SoundsDialog,
+            lambda app, name, url: app.add_sound(name, url),
+            lambda app: app.get_sound_names(),
+            lambda app, name: app.get_sound(name),
+        )
+
+    def test_rename_image_collision_reprompts(self):
+        self._check_rename_collision(
+            pwe.ImageDialog,
+            lambda app, name, url: app.add_image(name, url),
+            lambda app: app.get_image_names(),
+            lambda app, name: app.get_image(name),
+        )
+
+
+class ModuleNameCollision(unittest.TestCase):
+    """Regression tests for module name-collision handling.
+
+    `load_asset`/`rename_asset` proceed only when `name_is_unused(name)` is
+    True (the name is free). The module import/rename paths used to pass
+    `lambda name: name in self.app.modules`, which is inverted: importing a
+    file whose name matched an existing module was treated as a fresh name, so
+    it skipped the overwrite prompt and silently called `import_module` (and
+    rename then tripped `rename_module`'s assert). Separately, creating a new
+    module skipped the uniqueness check entirely and hit `new_module`'s assert.
+    """
+
+    def test_module_name_is_unused_semantics(self):
+        app = pwe.App()
+        app.modules["util"] = "x = 1\n"
+        ui = app.ui
+        # Existing names are NOT free...
+        self.assertFalse(ui._module_name_is_unused("util"))
+        self.assertFalse(ui._module_name_is_unused("main"))
+        # ...a new name is free.
+        self.assertTrue(ui._module_name_is_unused("fresh"))
+
+    def test_import_existing_name_prompts_overwrite(self):
+        """Importing a file named like an existing module must show the
+        overwrite prompt, not silently replace the module."""
+        app = pwe.App()
+        app.modules["util"] = "old = 1\n"
+        imported = []
+
+        async def _fake_import_module(name, file_handle, code):
+            imported.append(name)
+
+        app.import_module = _fake_import_module
+        with _stub_dialogs(typed=["util"], picked_name="util.py") as state:
+            asyncio.run(app.ui.on_import())
+
+        self.assertTrue(
+            any("already exists" in p.lower() for p in state["prompts"]),
+            f"expected an overwrite prompt for the colliding name; saw {state['prompts']}",
+        )
+        self.assertEqual(imported, ["util"])
+
+    def test_new_module_reprompts_on_duplicate(self):
+        """Creating a module with an existing name must re-prompt inline, not
+        replace the module or crash on new_module's assert."""
+        app = pwe.App()
+        app.modules["util"] = "x = 1\n"
+        with _stub_dialogs(typed=["util", "fresh"]) as state:  # taken, then free
+            asyncio.run(app.ui.on_new())
+
+        self.assertEqual(app.modules["util"], "x = 1\n")  # untouched
+        self.assertIn("fresh", app.modules)
+        self.assertEqual(app.active_module, "fresh")
+        self.assertTrue(
+            any("already exists" in p.lower() for p in state["prompts"]),
+            f"expected an inline duplicate-name message; saw {state['prompts']}",
+        )
+
+    def test_new_module_cancel_creates_nothing(self):
+        app = pwe.App()
+        before = dict(app.modules)
+        with _stub_dialogs(events=["cancel"]):
+            asyncio.run(app.ui.on_new())
+        self.assertEqual(app.modules, before)
+        self.assertEqual(app.active_module, "main")
 
 
 class StandaloneExportShape(unittest.TestCase):
