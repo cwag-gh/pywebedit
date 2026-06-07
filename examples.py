@@ -31,6 +31,7 @@ EXAMPLES = {
         ("sound", "Local and remote sounds"),
     ],
     "Games with canvas": [
+        ("mobile", "Example using touch events"),
         ("breakout", "Brick breaking"),
         ("lightcycles", "Lightcycles"),
     ],
