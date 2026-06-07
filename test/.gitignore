@@ -1,0 +1,4 @@
+# Isolated test environment (created by uv) and generated artifacts
+.venv/
+output/
+__pycache__/

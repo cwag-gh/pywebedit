@@ -78,3 +78,29 @@ dist/index.html: dist/pywebedit.html
 	cd dist && cp pywebedit.html index.html
 
 dist: dist/index.html dist/dev.html dist/pywebedit.zip
+
+# ---- Tests ----------------------------------------------------------------
+# Tier 1 (logic) needs only Python 3.10+. Tier 2 (browser, via Playwright)
+# needs the isolated env below, plus a built dist/. See test/ and the README.
+
+TEST_VENV = test/.venv
+TEST_PY   = $(TEST_VENV)/bin/python
+
+.PHONY: test test-logic test-setup
+
+# Full suite (logic + browser). Builds dist/ and the test env on demand.
+test: dist $(TEST_VENV)
+	$(TEST_PY) test/run.py
+
+# Only the zero-dependency logic tests -- no Playwright, no dist/ needed.
+test-logic:
+	python test/run.py --logic-only
+
+# Create the isolated test virtualenv and install Playwright + its browser.
+test-setup: $(TEST_VENV)
+
+$(TEST_VENV): test/pyproject.toml
+	uv venv $(TEST_VENV) --python 3.13
+	uv pip install --python $(TEST_PY) playwright
+	$(TEST_PY) -m playwright install chromium
+	touch $(TEST_VENV)

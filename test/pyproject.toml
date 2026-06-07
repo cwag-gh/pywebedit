@@ -1,0 +1,16 @@
+[project]
+name = "pywebedit-tests"
+version = "0.0.0"
+description = "Test harness for pywebedit. Tier 1 (logic) is stdlib-only; Tier 2 (browser E2E) uses Playwright."
+# Floor is set by pywebedit.py itself, which uses `str | None` syntax (PEP 604).
+requires-python = ">=3.10"
+
+# The ONLY runtime dependency, and only for the Tier 2 browser tests.
+# Tier 1 logic tests run on a bare Python with nothing installed.
+dependencies = [
+    "playwright>=1.40",
+]
+
+[tool.uv]
+# Keep the environment lean and reproducible.
+package = false

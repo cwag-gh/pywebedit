@@ -44,6 +44,90 @@ See the live version [here](https://robotfantastic.org/pywebedit/).
   running / testing locally). This is nice, so prefer them (unpkg).
 
 
+## Testing
+
+A small test harness lives in [`test/`](test/). It exercises the three things
+that actually matter for this project:
+
+1. **The editor comes up** – Brython compiles the app, both CodeMirror panes
+   mount, and the toolbar + examples menu populate.
+2. **Code runs dynamically** – clicking **Run** opens a generated window that
+   executes the Python and renders its output.
+3. **Export is standalone & offline** – the exported HTML, with Brython inlined
+   as base64, runs from disk with the network fully cut off and makes *zero*
+   external requests.
+
+The browser tests all run in a fully **offline** context, so they also prove
+the CDN-with-local-fallback wiring works with no internet (Run included).
+
+### Two tiers
+
+- **Tier 1 – logic tests (`test/test_logic.py`), zero dependencies.**
+  `pywebedit.py` is Brython, so it can't be imported under normal CPython
+  (`from browser import ...`). The harness installs a tiny fake `browser`
+  module (`test/browser_stub.py`) so the *pure-Python* core can be unit-tested
+  directly: the `build_html` ⇄ `split_html` round-trip (body, modules, sounds,
+  images), the chunked base64 `encode_js_for_html`, the standalone-export shape
+  (libraries inlined as `data:` URLs, no `http(s)`), and the build scripts
+  (`examples.py`, `utils/tagreplace.py`). Needs only **Python 3.10+** — no pip
+  installs at all.
+
+- **Tier 2 – browser end-to-end tests (`test/test_e2e.py`), one dependency:
+  [Playwright](https://playwright.dev/python/).** Drives a headless Chromium
+  (Chromium because the app relies on Chrome-only APIs) to prove the three
+  behaviours above in a real browser, all with the network forced off.
+  Playwright bundles its own browser, so there's nothing else to install. These
+  tests **skip cleanly** if Playwright (or a built `dist/`) is missing, so the
+  suite still runs with zero dependencies.
+
+### Setup (isolated, via `uv`)
+
+The browser tier's one dependency lives in a project-local virtualenv so it
+never touches your other environments. Either let `make` do it:
+
+```sh
+make test-setup     # create test/.venv and install Playwright + its browser
+```
+
+…or run the same steps by hand:
+
+```sh
+uv venv test/.venv --python 3.13
+uv pip install --python test/.venv/bin/python playwright
+test/.venv/bin/python -m playwright install chromium
+```
+
+### Running
+
+```sh
+make test          # build dist/ + test env as needed, then run both tiers
+make test-logic    # Tier 1 only — zero deps, no dist/, just Python 3.10+
+
+# Or invoke the runner directly:
+test/.venv/bin/python test/run.py              # both tiers
+test/.venv/bin/python test/run.py --logic-only # Tier 1 only
+test/.venv/bin/python test/run.py --e2e-only   # Tier 2 only
+test/.venv/bin/python test/run.py --build      # `make` dist/ first, then run
+python test/run.py --logic-only                # Tier 1 on any bare Python 3.10+
+```
+
+(Tier 2 needs a built `dist/`; `make test` builds it for you. If `dist/` is
+missing when running the runner directly, the browser tests skip with a hint.)
+
+### Notes / caveats
+
+- **Everything is tested offline.** The browser context uses Playwright's
+  `set_offline(True)` and loads from `file://`, so the CDN Brython fails exactly
+  as it would on a disconnected machine and the local `brython.min.js` fallback
+  takes over — for the editor, the Run popup, and exported files alike.
+- Don't intercept the CDN with Playwright *routing* to fake offline: aborting or
+  fulfilling a parser-blocking `<script>` mid-`document.write` truncates the
+  generated popup (a CDP quirk, not real browser behaviour). `set_offline` lets
+  the request fail naturally, which is why the Run test uses it.
+- Generated artifacts land in `test/output/` (git-ignored), including a real
+  `standalone_hello.html` you can open by hand.
+
+
 ## TODO
 
 - Increase speed of export
