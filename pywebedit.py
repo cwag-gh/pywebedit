@@ -996,6 +996,7 @@ class SoundsDialog(AssetDialog):
 
     For each sound in the row, the user can:
     - Play the sound
+    - Stop the sound
     - Delete the sound
     - Rename the sound
 
@@ -1005,6 +1006,7 @@ class SoundsDialog(AssetDialog):
     def __init__(self, app, top=100, left=200):
         super().__init__(app, 'Manage sounds', top=top, left=left)
         self.durations = {}  # Cache for sound durations
+        self.playing = {}    # name -> list of currently-playing Audio instances
         self.populate_table()
 
     def asset_type(self):
@@ -1040,11 +1042,15 @@ class SoundsDialog(AssetDialog):
         size_cell = self.size_cell(data_url)
         duration_cell = self.cell('...', align='right')
         actions_cell = self.cell('', align='center')
-        play_button = html.BUTTON("▶", style="margin-right: 5px;")
+        play_button = html.BUTTON("▶️", style="margin-right: 5px;")
         play_button.title = "Play sound"
         play_button.bind("click", lambda evt, n=name: self.play_sound(n))
 
-        actions_cell <= play_button + self.row_buttons(name)
+        stop_button = html.BUTTON("⏹️", style="margin-right: 5px;")
+        stop_button.title = "Stop sound"
+        stop_button.bind("click", lambda evt, n=name: self.stop_sound(n))
+
+        actions_cell <= play_button + stop_button + self.row_buttons(name)
 
         # Calculate duration asynchronously
         self.load_duration(name, data_url, duration_cell)
@@ -1068,12 +1074,27 @@ class SoundsDialog(AssetDialog):
         audio.bind('error', on_error)
 
     def play_sound(self, name):
-        """Play a sound."""
+        """Play a sound, keeping the instance so it can be stopped."""
         audio = window.Audio.new(self.app.get_sound(name))
+        self.playing.setdefault(name, []).append(audio)
+
+        def on_ended(evt):
+            instances = self.playing.get(name)
+            if instances and audio in instances:
+                instances.remove(audio)
+
+        audio.bind('ended', on_ended)
         try:
             audio.play()
         except Exception as e:
             console.log(f'Error playing sound {name}: {e}')
+
+    def stop_sound(self, name):
+        """Stop every currently-playing instance of a sound."""
+        for audio in self.playing.get(name, []):
+            audio.pause()
+            audio.currentTime = 0
+        self.playing[name] = []
 
 
 class ImageDialog(AssetDialog):

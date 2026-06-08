@@ -196,8 +196,8 @@ class RoundTrip(unittest.TestCase):
 
 class Assets(unittest.TestCase):
     """Sound/image management at the model level (the browser-free half of
-    'load a sound or image'). The actual play/preview UI is covered by the
-    Tier 2 tests ``test_load_and_play_sound`` / ``test_load_and_preview_image``.
+    'load a sound or image'). The play/preview UI is covered by the Tier 2
+    tests ``test_load_play_and_stop_sound`` / ``test_load_and_preview_image``.
     """
 
     def test_add_rename_delete(self):
@@ -268,6 +268,17 @@ class Assets(unittest.TestCase):
             lambda app: app.get_image_names(),
             lambda app, name: app.get_image(name),
         )
+
+    def test_sound_stop_clears_playing(self):
+        """Playing tracks each instance; stopping releases them all."""
+        app = pwe.App()
+        app.add_sound("laser", "data:audio/wav;base64,AAAA")
+        dialog = pwe.SoundsDialog(app)
+        dialog.play_sound("laser")
+        dialog.play_sound("laser")  # two overlapping instances
+        self.assertEqual(len(dialog.playing["laser"]), 2)
+        dialog.stop_sound("laser")
+        self.assertEqual(dialog.playing["laser"], [])
 
 
 class ModuleNameCollision(unittest.TestCase):

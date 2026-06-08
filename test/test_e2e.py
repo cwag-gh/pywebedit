@@ -22,9 +22,10 @@ CDN-with-local-fallback wiring that lets everything work with no internet.
                                      external requests -- the definitive
                                      "standalone, offline" proof.
 
-  4. test_load_and_play_sound ...... A sound loaded through the (faked) file
-                                     picker appears in the sounds dialog and
-                                     actually plays (HTMLMediaElement.play()).
+  4. test_load_play_and_stop_sound . A sound loaded through the (faked) file
+                                     picker appears in the sounds dialog, plays
+                                     (HTMLMediaElement.play()), and its stop
+                                     button stops it (HTMLMediaElement.pause()).
 
   5. test_load_and_preview_image ... An image loaded the same way appears as a
                                      thumbnail with its decoded dimensions, and
@@ -90,10 +91,11 @@ def _build_standalone_hello():
     return app.build_html(HELLO_BODY, HELLO_PY, libs_to_bundle=["brython", "brython_stdlib"])
 
 
-def _tiny_wav():
-    """A minimal but valid WAV (8-bit mono) the browser can actually play."""
+def _wav(seconds=2.0):
+    """A valid 8-bit mono WAV of the given length -- long enough that it is
+    still playing when the stop button is clicked."""
     sr = 8000
-    data = b"\x80" * 8
+    data = b"\x80" * int(sr * seconds)
     header = struct.pack("<4sI4s4sIHHIIHH4sI", b"RIFF", 36 + len(data), b"WAVE",
                          b"fmt ", 16, 1, 1, sr, sr, 1, 8, b"data", len(data))
     return header + data
@@ -114,16 +116,22 @@ def _tiny_png(w, h, rgba=(220, 40, 40, 255)):
 # Stand in for the File System Access picker (a native dialog Playwright can't
 # drive). Returns a handle whose getFile() yields the bytes we hand it, so the
 # real read_file_as_data_url -> add_sound/add_image path runs unchanged. Also
-# spies on HTMLMediaElement.play() so the sound test can confirm playback.
+# spies on HTMLMediaElement play()/pause() so the sound test can confirm both.
 _FAKE_PICKER_JS = """
 ([b64, name, mime]) => {
   window.__plays = 0;
+  window.__pauses = 0;
   const proto = window.HTMLMediaElement.prototype;
   if (!proto.__spied) {
-    const orig = proto.play;
+    const origPlay = proto.play;
     proto.play = function () {
       window.__plays++;
-      try { return orig.apply(this, arguments).catch(() => {}); } catch (e) { return; }
+      try { return origPlay.apply(this, arguments).catch(() => {}); } catch (e) { return; }
+    };
+    const origPause = proto.pause;
+    proto.pause = function () {
+      window.__pauses++;
+      return origPause.apply(this, arguments);
     };
     proto.__spied = true;
   }
@@ -205,19 +213,22 @@ class BrowserE2E(unittest.TestCase):
                 f"generated window did not run the code (errors: {popup_errors})",
             )
 
-    # --- 4. A loaded sound shows up and plays -------------------------------
-    def test_load_and_play_sound(self):
+    # --- 4. A loaded sound plays, and the stop button stops it --------------
+    def test_load_play_and_stop_sound(self):
         with self._editor_page() as (page, _errors):
-            _install_fake_picker(page, _tiny_wav(), "ping.wav", "audio/wav")
+            _install_fake_picker(page, _wav(), "ping.wav", "audio/wav")
             page.select_option("#pyfiles", "__add_sounds")  # opens the sounds dialog
             page.locator("button:has-text('Add sound')").first.click()
 
-            # The loaded sound appears as a row with a play (▶) button.
+            # The loaded sound appears with play (▶️) and stop (⏹️) buttons.
             page.wait_for_selector("button:has-text('▶')", timeout=10000)
-            page.locator("button:has-text('▶')").first.click()
+            self.assertEqual(page.locator("button:has-text('⏹')").count(), 1, "missing stop button")
 
+            page.locator("button:has-text('▶')").first.click()
             page.wait_for_function("window.__plays >= 1", timeout=5000)
-            self.assertGreaterEqual(page.evaluate("window.__plays"), 1)
+
+            page.locator("button:has-text('⏹')").first.click()
+            page.wait_for_function("window.__pauses >= 1", timeout=5000)
 
     # --- 5. A loaded image shows up and opens in the previewer --------------
     def test_load_and_preview_image(self):
