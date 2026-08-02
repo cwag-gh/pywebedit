@@ -31,8 +31,9 @@ See the live version [here](https://robotfantastic.org/pywebedit/).
   [urfdvw's Brython Editor](https://github.com/urfdvw/Brython-Editor)
 - Use a fallback so that it can run using local copies of the main
   javascript libraries (both the editor and the generated webpages)
-- Embed images and sound files to be truly portable, even offline
-  (where you can't load non-image files)
+- Embed images, sounds, and other files (CSS, fonts, ...) as data URLs to be
+  truly portable, even offline (where you can't load files from disk). Embedded
+  files are exposed to the program at `window.RESOURCES["name"]`.
 
 
 ## Implementation notes
@@ -42,6 +43,22 @@ See the live version [here](https://robotfantastic.org/pywebedit/).
 - Some CDNs are better than others for this project, in that they
   allow fetching resources from Origin: Null (like when you are
   running / testing locally). This is nice, so prefer them (unpkg).
+
+
+## Building
+
+```sh
+make          # build dist/ (index.html, dev.html, pywebedit.zip)
+make clean    # remove dist/
+```
+
+Prerequisites are just [`uv`](https://docs.astral.sh/uv/) and Node/npm. The
+build scripts (`examples.py`, `utils/tagreplace.py`) are stdlib-only, but need
+Python 3.10+, so the Makefile runs them through
+`uv run --no-project --python 3.13 python` — uv fetches that interpreter on
+demand and no virtualenv is created. Override with `make PY=/path/to/python` to
+use your own. `curl` pulls the JS/CSS deps into `dist/` (gitignored) on first
+build; `npm run build` in `pywebeditor/` rolls up the CodeMirror bundle.
 
 
 ## Testing
@@ -56,8 +73,11 @@ that actually matter for this project:
 3. **Export is standalone & offline** – the exported HTML, with Brython inlined
    as base64, runs from disk with the network fully cut off and makes *zero*
    external requests.
-4. **Sounds & images** – a loaded sound is embedded, survives save/reopen, and
-   plays; a loaded image is embedded and opens in the canvas previewer.
+4. **Sounds & images** – a loaded sound is embedded, survives save/reopen,
+   plays, and stops; a loaded image is embedded and opens in the canvas previewer.
+5. **Other files (CSS, fonts)** – a loaded file is embedded as a data URL in
+   `window.RESOURCES`; an exported page styles itself with an embedded
+   stylesheet and loads an embedded `@font-face` font, fully offline.
 
 The browser tests all run in a fully **offline** context, so they also prove
 the CDN-with-local-fallback wiring works with no internet (Run included).

@@ -9,7 +9,7 @@ from browser.widgets.dialog import InfoDialog, Dialog, EntryDialog
 
 
 BRYTHON_VERSION = '3.13.2'
-PYWEBEDIT_VERSION = '0.2.5'
+PYWEBEDIT_VERSION = '0.3.0'
 
 
 INITIAL_HTML = """
@@ -119,6 +119,9 @@ window.SOUNDS = %sounds%
 # Load image resources
 window.IMAGES = %images%
 
+# Load other file resources (css, fonts, etc.) as data URLs
+window.RESOURCES = %resources%
+
 # Load modules - use runPythonSource as it is synchronous
 for module in [%modules%]:
     __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
@@ -171,7 +174,8 @@ PYFILES = [('main', 'main'),
            ('Remove this python module', '__remove'),
            (None, None),
            ('Add sounds...', '__add_sounds'),
-           ('Add images...', '__add_images')]
+           ('Add images...', '__add_images'),
+           ('Add other files...', '__add_files')]
 
 
 PICKER_ID = 'choosefile'
@@ -408,12 +412,13 @@ async def rename_asset(initial_name: str,
 
 async def load_asset(asset_type: str,
                      name_is_valid: Callable[[str], str | None],
-                     name_is_unused: Callable[[str], bool]):
+                     name_is_unused: Callable[[str], bool],
+                     keep_extension: bool = False):
     """Opens file for import. Runs through workflow checking name conflicts."""
     file_handle = await pick_file_to_open()
     if file_handle is None:
         return None, None
-    asset_name = strip_extension(file_handle.name)
+    asset_name = file_handle.name if keep_extension else strip_extension(file_handle.name)
     while True:
         while True:
             errmsg = name_is_valid(asset_name)
@@ -655,6 +660,8 @@ class UI:
             self.on_add_sounds()
         elif module == '__add_images':
             self.on_add_images()
+        elif module == '__add_files':
+            self.on_add_files()
         else:
             self.app.select_module(module, self.contents_python(), self.viewinfo_python())
 
@@ -676,6 +683,15 @@ class UI:
     def on_add_images(self):
         """Show a dialog with a table of already included images, and a button to add more."""
         self.images_dialog = ImageDialog(self.app, top=100, left=200)
+
+    def on_add_files(self):
+        """Show a dialog for managing generic file resources (css, fonts, etc.)."""
+        self.resources_dialog = ResourceDialog(self.app, top=100, left=200)
+
+    def update_resource_dialog(self):
+        """Update the resource dialog if it's currently open."""
+        if hasattr(self, 'resources_dialog') and self.resources_dialog:
+            self.resources_dialog.populate_table()
 
     def _current_module_index(self):
         modnames = list(self.app.modules.keys())
@@ -893,6 +909,8 @@ class AssetDialog(Dialog):
 
     Asset size is shown in the row, in kB, as well as other asset specific data.
     """
+    keep_extension = False  # subclasses set True to keep the file extension in the name
+
     def __init__(self, app, title, top=100, left=200):
         super().__init__(title, ok_cancel=False, top=top, left=left)
         self.app = app
@@ -986,7 +1004,8 @@ class AssetDialog(Dialog):
         """Load a new asset from a file."""
         name, file_handle = await load_asset(self.asset_type(),
                                              self.check_valid_asset_name,
-                                             self.check_name_is_unused)
+                                             self.check_name_is_unused,
+                                             keep_extension=self.keep_extension)
         if name is not None:
             await self.on_add(name, file_handle)
 
@@ -1627,6 +1646,126 @@ class ImageViewDialog(Dialog):
         self.render()
 
 
+def resource_mime(data_url):
+    """The MIME type embedded in a data URL, or '' if absent/unparsable."""
+    if data_url and data_url.startswith('data:') and ';' in data_url:
+        return data_url[len('data:'):data_url.index(';')]
+    return ''
+
+
+def _has_extension(name, extensions):
+    return '.' in name and name.lower().rsplit('.', 1)[-1] in extensions
+
+
+def resource_is_font(name, mime):
+    return mime.startswith('font') or _has_extension(name, {'woff', 'woff2', 'ttf', 'otf'})
+
+
+def resource_is_text(name, mime):
+    if mime.startswith('text') or mime in ('application/json', 'application/javascript'):
+        return True
+    return _has_extension(name, {'css', 'js', 'json', 'txt', 'svg', 'html', 'xml'})
+
+
+class ResourceDialog(AssetDialog):
+    """Dialog for managing generic file resources (css, fonts, etc.).
+
+    Each file is embedded as a data URL and exposed at window.RESOURCES[name].
+    Rows offer a preview, rename, and delete. Unlike sounds/images, the file
+    extension is kept in the name so 'a.css' and 'a.js' don't collide.
+    """
+    keep_extension = True
+
+    def __init__(self, app, top=100, left=200):
+        super().__init__(app, 'Manage files', top=top, left=left)
+
+    def asset_type(self):
+        return 'file'
+
+    def helptext(self):
+        return ('Files added here are embedded and made available as data URLs '
+                'in window.RESOURCES (e.g. window.RESOURCES["style.css"]). Use '
+                'them for CSS, fonts, and other assets your page needs offline.')
+
+    def names(self):
+        return self.app.get_resource_names()
+
+    def additional_columns(self) -> list[str]:
+        return ['Type']
+
+    def check_name_is_unused(self, name):
+        return name not in self.app.resources
+
+    def on_rename(self, name, new_name):
+        self.app.rename_resource(name, new_name)
+
+    def on_delete(self, name):
+        self.app.delete_resource(name)
+
+    async def on_add(self, name, file_handle):
+        data_url = await read_file_as_data_url(file_handle)
+        if data_url is not None:
+            self.app.add_resource(name, data_url)
+
+    def row_cells(self, name):
+        data_url = self.app.get_resource(name)
+        name_cell = self.cell(name)
+        size_cell = self.size_cell(data_url)
+        type_cell = self.cell(resource_mime(data_url) or '—', align='right')
+        actions_cell = self.cell('', align='center')
+
+        view_button = html.BUTTON("🔍", style="margin-right: 5px;")
+        view_button.title = "Preview file"
+        view_button.bind("click", lambda evt, n=name: ResourceViewDialog(self.app, n))
+
+        actions_cell <= view_button + self.row_buttons(name)
+        return name_cell + size_cell + type_cell + actions_cell
+
+
+class ResourceViewDialog(Dialog):
+    """Preview a file resource: fonts render a sample, text files show their
+    contents, anything else just shows its type."""
+    def __init__(self, app, name, top=80, left=120):
+        super().__init__(f'Preview: {name}', ok_cancel=False, top=top, left=left)
+        self.app = app
+        self.name = name
+        self.data_url = app.get_resource(name)
+        self.init_ui()
+
+    def init_ui(self):
+        mime = resource_mime(self.data_url)
+        container = html.DIV(style="width: 640px; max-height: 600px; overflow: auto;")
+        container <= html.DIV(f'Type: {mime or "unknown"}',
+                              style="margin-bottom: 8px; font-family: monospace; color: #555;")
+        if resource_is_font(self.name, mime):
+            container <= self._font_preview()
+        elif resource_is_text(self.name, mime):
+            container <= self._text_preview()
+        else:
+            container <= html.DIV('No preview available for this file type.')
+        self.panel <= container
+
+    def _font_preview(self):
+        family = 'pwepreview_' + ''.join(c for c in self.name if c.isalnum())
+        document.head <= html.STYLE(
+            "@font-face { font-family: '" + family + "'; src: url('" + self.data_url + "'); }")
+        div = html.DIV(style=f"font-family: '{family}';")
+        for size in (16, 24, 36, 48):
+            div <= html.DIV('The quick brown fox jumps over the lazy dog 0123',
+                            style=f"font-size: {size}px; margin: 6px 0;")
+        return div
+
+    def _text_preview(self):
+        try:
+            b64 = self.data_url.split(',', 1)[1]
+            text = base64.b64decode(b64).decode('utf-8')
+        except Exception:
+            text = '(unable to decode this file as text)'
+        return html.PRE(text, style=("white-space: pre-wrap; background: #f4f4f4; "
+                                     "padding: 8px; border: 1px solid #ddd; "
+                                     "max-height: 480px; overflow: auto;"))
+
+
 class App:
     def __init__(self):
         self.file_handle = None
@@ -1636,10 +1775,11 @@ class App:
         self.modules_viewinfo: dict[str, ViewInfo] = {}
         self.sounds: dict[str, str] = {} # Name -> base64 encoded sound as a data URL
         self.images: dict[str, str] = {} # Name -> base64 encoded image as a data URL
+        self.resources: dict[str, str] = {} # Name -> base64 encoded file as a data URL
         self.libraries: dict[str, str] = {} # Name -> contents of javascript library (cache)
         self.active_module = 'main'
-        self.orig_modules = dict(self.modules)
         self.orig_body = INITIAL_HTML
+        self._remember_saved_state()
         self.save_on_run = False
         self.show_save_on_run = True
 
@@ -1648,23 +1788,20 @@ class App:
         self.ui.set_contents_html(self.orig_body)
         self.update_ui(update_python_text=True)
 
+    def _remember_saved_state(self):
+        """Snapshot modules and assets as the baseline for change detection."""
+        self.orig_modules = dict(self.modules)
+        self.orig_sounds = dict(self.sounds)
+        self.orig_images = dict(self.images)
+        self.orig_resources = dict(self.resources)
+
     def anything_modified(self, current_body, current_python):
         self.modules[self.active_module] = current_python
-        if current_body != self.orig_body:
-            console.log('Mismatched body')
-            return True
-        if set(self.orig_modules.keys()) != set(self.modules.keys()):
-            console.log('Module list mismatch')
-            return True
-        for k in self.modules:
-            if self.orig_modules[k] != self.modules[k]:
-                console.log(f'Module {k} mismatch')
-                # console.log(f'Orig module {k}:')
-                # console.log(self.orig_modules[k])
-                # console.log(f'Current module {k}:')
-                # console.log(self.modules[k])
-                return True
-        return False
+        return (current_body != self.orig_body
+                or self.modules != self.orig_modules
+                or self.sounds != self.orig_sounds
+                or self.images != self.orig_images
+                or self.resources != self.orig_resources)
 
     def has_file(self):
         return self.file_handle != None
@@ -1730,21 +1867,19 @@ class App:
 
     def load_html(self, contents):
         try:
-            body, modules, sounds, images = self.split_html(contents)
+            body, modules, sounds, images, resources = self.split_html(contents)
         except Exception as e:
             console.log(e)
             err('Looks like this file was not saved by pywebedit. Unable to load.')
             return False
-        # Save copies so we can detect when edited
         self.orig_body = body
-        self.orig_modules = modules
-        # Set up modules and active module
         self.modules = dict(modules)
         self.active_module = 'main'
         self.modules_viewinfo = {}
-        # Save resources
         self.sounds = sounds
         self.images = images
+        self.resources = resources
+        self._remember_saved_state()  # baseline for change detection
         # Load successful
         self.ui.set_contents_html(body)
         self.update_ui(update_python_text=True)
@@ -1760,14 +1895,17 @@ class App:
         # Body has extra line - remove it
         body = '\n'.join(body.splitlines()[1:])
 
-        # Extract sounds and images from precode
+        # Extract embedded resources from precode. Each block is guarded so
+        # files saved by older versions (no RESOURCES, or no assets at all)
+        # still load.
         sounds = {}
         images = {}
+        resources = {}
         if 'window.SOUNDS = {' in precode:
-            sounds_dict_as_str = extract_between(precode, 'window.SOUNDS = {', '}')
-            images_dict_as_str = extract_between(precode, 'window.IMAGES = {', '}')
-            sounds = parse_str_str_dict(sounds_dict_as_str)
-            images = parse_str_str_dict(images_dict_as_str)
+            sounds = parse_str_str_dict(extract_between(precode, 'window.SOUNDS = {', '}'))
+            images = parse_str_str_dict(extract_between(precode, 'window.IMAGES = {', '}'))
+        if 'window.RESOURCES = {' in precode:
+            resources = parse_str_str_dict(extract_between(precode, 'window.RESOURCES = {', '}'))
 
         modules = {}
         lines = script_and_foot.strip().splitlines()
@@ -1779,7 +1917,7 @@ class App:
             modname = lines[0].replace('"__pwe_', '').replace('">', '')
             modules[modname] = '\n'.join(lines[1:-2])
 
-        return body, modules, sounds, images
+        return body, modules, sounds, images, resources
 
     def run(self, html_body, python_code):
         html = self.build_html(html_body, python_code)
@@ -1865,9 +2003,10 @@ class App:
                 m = m.replace('%' + key + '%', value)
             module_texts.append(m)
 
-        # Save embedded sounds and images
+        # Save embedded sounds, images, and other file resources
         sounds = "{" + ",\n".join(f"'{key}':'{val}'" for key,val in self.sounds.items()) + "}"
         images = "{" + ",\n".join(f"'{key}':'{val}'" for key,val in self.images.items()) + "}"
+        resources = "{" + ",\n".join(f"'{key}':'{val}'" for key,val in self.resources.items()) + "}"
 
         # Note this is order dependent
         tagmap = {'libraries':       libtxt,
@@ -1879,7 +2018,8 @@ class App:
                   'modules':         ', '.join(f"'__pwe_{m}'" for m in self.modules if m != 'main'),
                   'modulescripts':   '\n\n'.join(module_texts),
                   'sounds':          sounds,
-                  'images':          images}
+                  'images':          images,
+                  'resources':       resources}
         p = PAGE_TEMPLATE
         for key, value in tagmap.items():
             p = p.replace('%' + key + '%', value)
@@ -1899,7 +2039,7 @@ class App:
         console.log(f'Wrote {self.file_name}')
         # Update known saved version
         self.orig_body = html_body
-        self.orig_modules = dict(self.modules)
+        self._remember_saved_state()
         self.update_ui(update_python_text=True)
         if not quiet and self.show_save_on_run:
             self.ui.show_save_on_run_dialog(self.save_on_run)
@@ -2007,6 +2147,30 @@ class App:
         assert name in self.images
         del self.images[name]
         self.ui.update_image_dialog()
+
+    # Resource (generic file) management
+    def get_resource_names(self):
+        return list(self.resources.keys())
+
+    def get_resource(self, name):
+        return self.resources.get(name)
+
+    def add_resource(self, name, data_url):
+        """Add a file resource. If name already in resources, replace it."""
+        self.resources[name] = data_url
+        self.ui.update_resource_dialog()
+
+    def rename_resource(self, old_name, new_name):
+        assert old_name in self.resources
+        assert new_name not in self.resources
+        self.resources[new_name] = self.resources[old_name]
+        del self.resources[old_name]
+        self.ui.update_resource_dialog()
+
+    def delete_resource(self, name):
+        assert name in self.resources
+        del self.resources[name]
+        self.ui.update_resource_dialog()
 
 
 app = App()

@@ -31,6 +31,13 @@ CDN-with-local-fallback wiring that lets everything work with no internet.
                                      thumbnail with its decoded dimensions, and
                                      opens in the interactive canvas previewer.
 
+  6. test_exported_file_runs_fully_offline ... standalone export proof.
+  7. test_css_resource_applies_offline ...... an embedded CSS file, reached via
+                                     window.RESOURCES, styles the page offline.
+  8. test_font_resource_applies_offline ..... an embedded font, reached via
+                                     window.RESOURCES, loads via @font-face offline.
+  9. test_add_file_and_preview ...... a loaded file keeps its name and previews.
+
 Requires Playwright + its Chromium browser, and a built ``dist/`` (run ``make``).
 Tests skip cleanly, with guidance, if either is missing.
 
@@ -78,17 +85,34 @@ TEXT_READY = (
 )
 
 
+SAMPLE_FONT = os.path.join(REPO_ROOT, "playground/pygame/aliens/data/sans.ttf")
+
+
 def _dist_ready():
     return all(os.path.exists(os.path.join(DIST, f)) for f in REQUIRED_DIST)
 
 
-def _build_standalone_hello():
-    """Use the real export code path to inline real Brython into one file."""
+def _standalone(body, py, resources=None):
+    """Build a standalone HTML file via the real export path (Brython inlined)."""
     app = pwe.App()
     for lib, fname in (("brython", "brython.min.js"), ("brython_stdlib", "brython_stdlib.js")):
         with open(os.path.join(DIST, fname), encoding="utf-8") as f:
             app.libraries[lib] = f.read()
-    return app.build_html(HELLO_BODY, HELLO_PY, libs_to_bundle=["brython", "brython_stdlib"])
+    if resources:
+        app.resources = resources
+    return app.build_html(body, py, libs_to_bundle=["brython", "brython_stdlib"])
+
+
+def _data_url(mime, raw_bytes):
+    return f"data:{mime};base64," + base64.b64encode(raw_bytes).decode()
+
+
+def _write_output(name, content):
+    out = os.path.join(HERE, "output", name)
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    with open(out, "w", encoding="utf-8") as f:
+        f.write(content)
+    return out
 
 
 def _wav(seconds=2.0):
@@ -181,6 +205,30 @@ class BrowserE2E(unittest.TestCase):
         finally:
             context.close()
 
+    @contextlib.contextmanager
+    def _offline_file_page(self, path):
+        """Load a file:// page fully offline; yield (page, external, errors)
+        where external records any non-file request the page attempted."""
+        context = self._offline_context()
+        external = []
+
+        def block(route):
+            if route.request.url.startswith("file:"):
+                route.continue_()
+            else:
+                external.append(route.request.url)
+                route.abort()
+
+        context.route("**/*", block)
+        page = context.new_page()
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        try:
+            page.goto(Path(path).as_uri())
+            yield page, external, errors
+        finally:
+            context.close()
+
     # --- 1. Editor comes up (offline, via local brython fallback) -----------
     def test_editor_mounts(self):
         with self._editor_page() as (page, errors):
@@ -252,39 +300,71 @@ class BrowserE2E(unittest.TestCase):
 
     # --- 6. Exported file is standalone AND runs fully offline --------------
     def test_exported_file_runs_fully_offline(self):
-        html = _build_standalone_hello()
+        html = _standalone(HELLO_BODY, HELLO_PY)
         self.assertNotIn("https://", html, "exported file still references the network")
-
-        out = os.path.join(HERE, "output", "standalone_hello.html")
-        os.makedirs(os.path.dirname(out), exist_ok=True)
-        with open(out, "w", encoding="utf-8") as f:
-            f.write(html)
-
-        context = self._offline_context()
-        external = []
-
-        def block_external(route):
-            url = route.request.url
-            if url.startswith("file:"):
-                route.continue_()
-            else:
-                external.append(url)  # any non-file request = not standalone
-                route.abort()
-
-        context.route("**/*", block_external)
-        page = context.new_page()
-        errors = []
-        page.on("pageerror", lambda e: errors.append(str(e)))
-        try:
-            page.goto(Path(out).as_uri())
+        out = _write_output("standalone_hello.html", html)
+        with self._offline_file_page(out) as (page, external, errors):
             page.wait_for_function(TEXT_READY, timeout=25000)
             self.assertEqual(
                 page.eval_on_selector("#text", "el => el.textContent"), "Hello, World!"
             )
             self.assertEqual(external, [], f"file made external requests: {external}")
             self.assertEqual(errors, [], f"unexpected page errors: {errors}")
-        finally:
-            context.close()
+
+    # --- 7. An embedded CSS resource applies, offline, from window.RESOURCES -
+    def test_css_resource_applies_offline(self):
+        resources = {"style.css": _data_url("text/css", b"#text { color: rgb(7, 8, 9); }")}
+        body = "<h1 id='text'></h1>"
+        py = (
+            "from browser import document, window, html\n"
+            "document.head <= html.LINK(rel='stylesheet', href=window.RESOURCES['style.css'])\n"
+            "document['text'].textContent = 'styled'\n"
+        )
+        out = _write_output("standalone_css.html", _standalone(body, py, resources))
+        with self._offline_file_page(out) as (page, external, errors):
+            page.wait_for_function(
+                "document.getElementById('text') && "
+                "getComputedStyle(document.getElementById('text')).color === 'rgb(7, 8, 9)'",
+                timeout=25000,
+            )
+            self.assertEqual(external, [], f"file made external requests: {external}")
+            self.assertEqual(errors, [], f"unexpected page errors: {errors}")
+
+    # --- 8. An embedded font resource loads, offline, from window.RESOURCES --
+    @unittest.skipUnless(os.path.exists(SAMPLE_FONT), "sample font fixture not present")
+    def test_font_resource_applies_offline(self):
+        with open(SAMPLE_FONT, "rb") as f:
+            resources = {"sans.ttf": _data_url("font/ttf", f.read())}
+        body = "<h1 id='text'></h1>"
+        py = (
+            "from browser import document, window, html\n"
+            "document.head <= html.STYLE(\"@font-face{font-family:'RT';"
+            "src:url('\" + window.RESOURCES['sans.ttf'] + \"')}\")\n"
+            "document['text'].style.fontFamily = 'RT'\n"
+            "document['text'].textContent = 'font'\n"
+        )
+        out = _write_output("standalone_font.html", _standalone(body, py, resources))
+        with self._offline_file_page(out) as (page, external, errors):
+            page.wait_for_function("document.fonts.check('16px RT')", timeout=25000)
+            self.assertEqual(external, [], f"file made external requests: {external}")
+            self.assertEqual(errors, [], f"unexpected page errors: {errors}")
+
+    # --- 9. A loaded file keeps its name and previews its contents ----------
+    def test_add_file_and_preview(self):
+        with self._editor_page() as (page, _errors):
+            css = "/* PREVIEW-MARKER */ #x { color: red; }"
+            _install_fake_picker(page, css.encode(), "style.css", "text/css")
+            page.select_option("#pyfiles", "__add_files")  # opens the files dialog
+            page.locator("button:has-text('Add file')").first.click()
+
+            # The name keeps its extension (unlike sounds/images).
+            page.wait_for_selector("text=style.css", timeout=10000)
+
+            # Previewing decodes and shows the file's contents.
+            page.locator("button:has-text('🔍')").first.click()
+            page.wait_for_function(
+                "() => document.body.innerText.includes('PREVIEW-MARKER')", timeout=10000
+            )
 
 
 if __name__ == "__main__":

@@ -27,8 +27,9 @@ EXAMPLES = {
         ("fullcanvas", "Full screen canvas drawing"),
         ("springs", "Spring animation with vectors"),
     ],
-    "Playing sounds": [
+    "Embedding resources": [
         ("sound", "Local and remote sounds"),
+        ("embedded_resources", "Local fonts and CSS"),
     ],
     "Games with canvas": [
         ("mobile", "Example using touch events"),

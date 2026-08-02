@@ -172,26 +172,40 @@ class RoundTrip(unittest.TestCase):
         app = pwe.App()
         app.sounds = {"laser": "data:audio/mpeg;base64,QUFBQQ=="}
         app.images = {"bunny": "data:image/png;base64,Qk1Q"}
+        app.resources = {"style.css": "data:text/css;base64,Ym9keXt9"}
         app.modules["util"] = "PI = 3.14159\n\ndef area(r):\n    return PI * r * r\n"
         html = app.build_html(HELLO_BODY, HELLO_PY)
 
         reader = pwe.App()
-        body, modules, sounds, images = reader.split_html(html)
+        body, modules, sounds, images, resources = reader.split_html(html)
 
         self.assertEqual(body.strip(), HELLO_BODY.strip())
         self.assertEqual(modules["main"].strip(), HELLO_PY.strip())
         self.assertEqual(modules["util"].strip(), app.modules["util"].strip())
         self.assertEqual(sounds, app.sounds)
         self.assertEqual(images, app.images)
+        self.assertEqual(resources, app.resources)
 
     def test_roundtrip_no_assets(self):
         app = pwe.App()
         html = app.build_html(HELLO_BODY, HELLO_PY)
-        body, modules, sounds, images = pwe.App().split_html(html)
+        body, modules, sounds, images, resources = pwe.App().split_html(html)
         self.assertEqual(body.strip(), HELLO_BODY.strip())
         self.assertEqual(modules["main"].strip(), HELLO_PY.strip())
         self.assertEqual(sounds, {})
         self.assertEqual(images, {})
+        self.assertEqual(resources, {})
+
+    def test_old_file_without_resources_block_loads(self):
+        """Files saved before RESOURCES existed must still load (resources empty)."""
+        app = pwe.App()
+        app.add_sound("laser", "data:audio/mpeg;base64,QUFBQQ==")
+        html = app.build_html(HELLO_BODY, HELLO_PY)
+        old = html.replace("window.RESOURCES = {}", "")  # simulate a pre-RESOURCES file
+        self.assertNotIn("window.RESOURCES = {", old)
+        _, _, sounds, images, resources = pwe.App().split_html(old)
+        self.assertEqual(sounds, {"laser": "data:audio/mpeg;base64,QUFBQQ=="})
+        self.assertEqual(resources, {})
 
 
 class Assets(unittest.TestCase):
@@ -232,7 +246,7 @@ class Assets(unittest.TestCase):
         app.add_image("bunny", "data:image/png;base64,Qk1Q")
         html = app.build_html(HELLO_BODY, HELLO_PY)
 
-        _, _, sounds, images = pwe.App().split_html(html)
+        _, _, sounds, images, _ = pwe.App().split_html(html)
         self.assertEqual(sounds, {"laser": "data:audio/mpeg;base64,QUFBQQ=="})
         self.assertEqual(images, {"bunny": "data:image/png;base64,Qk1Q"})
 
@@ -279,6 +293,24 @@ class Assets(unittest.TestCase):
         self.assertEqual(len(dialog.playing["laser"]), 2)
         dialog.stop_sound("laser")
         self.assertEqual(dialog.playing["laser"], [])
+
+    def test_resource_add_rename_delete(self):
+        app = pwe.App()
+        app.add_resource("style.css", "data:text/css;base64,Ym9keXt9")
+        self.assertEqual(app.get_resource("style.css"), "data:text/css;base64,Ym9keXt9")
+        self.assertEqual(app.get_resource_names(), ["style.css"])
+        app.rename_resource("style.css", "theme.css")
+        self.assertEqual(app.get_resource_names(), ["theme.css"])
+        app.delete_resource("theme.css")
+        self.assertEqual(app.get_resource_names(), [])
+
+    def test_rename_resource_collision_reprompts(self):
+        self._check_rename_collision(
+            pwe.ResourceDialog,
+            lambda app, name, url: app.add_resource(name, url),
+            lambda app: app.get_resource_names(),
+            lambda app, name: app.get_resource(name),
+        )
 
 
 class ModuleNameCollision(unittest.TestCase):
@@ -422,6 +454,28 @@ class BuildScripts(unittest.TestCase):
             self.assertIn("<script>NEW</script>", result)
         finally:
             os.unlink(tmp)
+
+
+class ModificationTracking(unittest.TestCase):
+    """anything_modified must flag edits to the HTML, modules, AND every asset
+    type, and a save must reset that baseline."""
+
+    PRISTINE = (pwe.INITIAL_HTML, pwe.INITIAL_PYTHON)
+
+    def test_asset_changes_mark_modified(self):
+        for add in (lambda a: a.add_sound("x", "data:audio/wav;base64,AAAA"),
+                    lambda a: a.add_image("x", "data:image/png;base64,AAAA"),
+                    lambda a: a.add_resource("x.css", "data:text/css;base64,AAAA")):
+            app = pwe.App()
+            self.assertFalse(app.anything_modified(*self.PRISTINE))
+            add(app)
+            self.assertTrue(app.anything_modified(*self.PRISTINE))
+
+    def test_save_resets_baseline(self):
+        app = pwe.App()
+        app.add_resource("style.css", "data:text/css;base64,AAAA")
+        app._remember_saved_state()  # what save_file does once the file is written
+        self.assertFalse(app.anything_modified(*self.PRISTINE))
 
 
 if __name__ == "__main__":

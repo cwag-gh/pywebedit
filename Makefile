@@ -10,6 +10,11 @@
 #    https://raw.githack.com/brython-dev/brython/master/www/src/brython.js \
 #    https://raw.githack.com/brython-dev/brython/master/www/src/brython_stdlib.js \
 
+# Build/test scripts are stdlib-only, but need Python 3.10+ (pywebedit.py uses
+# PEP 604 `str | None`). uv fetches the interpreter on demand; no venv required.
+PY_VERSION = 3.13
+PY ?= uv run --no-project --python $(PY_VERSION) python
+
 JS_DEPS = \
     https://cdn.jsdelivr.net/npm/brython@3.13.2/brython.min.js \
     https://cdn.jsdelivr.net/npm/brython@3.13.2/brython_stdlib.js \
@@ -41,11 +46,11 @@ clean:
 
 dist/pywebedit.html: pywebedit.py pywebedit.html_template
 	mkdir -p dist
-	python utils/tagreplace.py pywebedit.html_template "<script type=\"text/python\">" "</script>" pywebedit.py -o $@
+	$(PY) utils/tagreplace.py pywebedit.html_template "<script type=\"text/python\">" "</script>" pywebedit.py -o $@
 
 dist/dev.html: pywebedit.py dev.html_template
 	mkdir -p dist
-	python utils/tagreplace.py dev.html_template "<script type=\"text/python\">" "</script>" pywebedit.py -o $@
+	$(PY) utils/tagreplace.py dev.html_template "<script type=\"text/python\">" "</script>" pywebedit.py -o $@
 
 dist/pywebeditor.min.js: pywebeditor/package.json pywebeditor/editor.mjs pywebeditor/rollup.config.js
 	mkdir -p dist
@@ -54,7 +59,7 @@ dist/pywebeditor.min.js: pywebeditor/package.json pywebeditor/editor.mjs pywebed
 
 dist/examples.js: examples.py
 	mkdir -p dist
-	python examples.py $@
+	$(PY) examples.py $@
 
 # Generic rule for downloading JS files
 dist/%.js:
@@ -94,13 +99,13 @@ test: dist $(TEST_VENV)
 
 # Only the zero-dependency logic tests -- no Playwright, no dist/ needed.
 test-logic:
-	python test/run.py --logic-only
+	$(PY) test/run.py --logic-only
 
 # Create the isolated test virtualenv and install Playwright + its browser.
 test-setup: $(TEST_VENV)
 
 $(TEST_VENV): test/pyproject.toml
-	uv venv $(TEST_VENV) --python 3.13
+	uv venv $(TEST_VENV) --python $(PY_VERSION)
 	uv pip install --python $(TEST_PY) playwright
 	$(TEST_PY) -m playwright install chromium
 	touch $(TEST_VENV)
