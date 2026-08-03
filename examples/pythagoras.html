@@ -2,11 +2,11 @@
 <html>
 <head>
 <meta charset="utf-8">
-<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython.min.js"></script>
-<script> typeof brython === "undefined" && document.write('<script src="brython.min.js">\x3C/script>')</script>
 
-<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython_stdlib.js"></script>
-<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write('<script src="brython_stdlib.js">\x3C/script>')</script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.2/brython.min.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__ === "undefined" && document.write("<script src=\"brython.min.js\">\x3C/script>")</script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.2/brython_stdlib.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write("<script src=\"brython_stdlib.js\">\x3C/script>")</script>
 
 
 <script type="text/javascript">
@@ -17,12 +17,25 @@ function __brython_pre_then_code() {
 </head>
 
 <body onload="__brython_pre_then_code()">
-<div align="center">
-<canvas id="canvas" 
-        width="1000" 
-        height="800"></canvas>
-</div>
+<!--
+Using the template we set up last time, here is a fun
+animation of a math proof.
 
+We hide the letterboxing just by setting the color to be 
+all white.
+-->
+<style>
+    * { margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+        background: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+</style>
+
+<canvas id="canvas" width="1000" height="800"></canvas>
 <script type="text/python" id="brythonpre">
 from browser import document, window
 
@@ -37,6 +50,15 @@ class __ErrorReporter:
             document.body.insertBefore(self.errdiv, document.body.firstChild)
         self.errdiv.textContent += ("\n" + msg)
 sys.stderr = __ErrorReporter()
+
+# Load sound resouces
+window.SOUNDS = {}
+
+# Load image resources
+window.IMAGES = {}
+
+# Load other file resources (css, fonts, etc.) as data URLs
+window.RESOURCES = {}
 
 # Load modules - use runPythonSource as it is synchronous
 for module in ['__pwe_game1']:
@@ -142,7 +164,7 @@ HT = document['canvas'].height
 dt = 0.5
 
 xmargin = 200
-ymargin = 30
+ymargin = 120
 a = 150
 b = 200
 c = math.sqrt(a*a + b*b)
@@ -160,6 +182,15 @@ G = (xmargin, ymargin + a + b)
 H = (xmargin + a + b, ymargin)
 I = (xmargin, ymargin + b)
 J = (xmargin + a, ymargin)
+
+
+def resize_canvas(_):
+    # Each screen dimension limits how big the frame can get;
+    # the smaller limit wins, so both dimensions always fit.
+    scale = min(window.innerWidth / WD, window.innerHeight / HT)
+    document['canvas'].style.width = f"{WD * scale}px"
+    document['canvas'].style.height = f"{HT * scale}px"
+    
 
 def title():
     draw_text("Euclid's proof of the Pythagorean Theorem",
@@ -234,7 +265,9 @@ async def main():
               font_size=fontsize, font_family=family, bold=True)
     draw_text("suckers", WD/2, HT/2 + 1.05 * fontsize/2, 
               font_size=fontsize, font_family=family, bold=True)
-    
+
+resize_canvas(0)
+window.addEventListener("resize", resize_canvas)
 aio.run(main())
 </script>
 </body>

@@ -26,6 +26,12 @@ canvas { display: block; image-rendering: pixelated; }
 
 in between the style tags if you want the drawing to be pixel perfect
 (like for sprites).
+
+See this time we did not specify the size of the canvas. We use style
+rules to get it to fill the screen, then in the python code we
+set the number of pixels that the canvas uses internally to have
+a 1:1 relationship with the pixels on the screen. So, when drawing using
+this approach, you need to do it relative to the actual size.
 -->
 <style>
     * { margin: 0; padding: 0; }
@@ -33,7 +39,7 @@ in between the style tags if you want the drawing to be pixel perfect
 </style>
    
 
-<canvas id="gameCanvas" /canvas>
+<canvas id="gameCanvas"></canvas>
 
 
 <script type="text/python" id="brythonpre">
@@ -56,6 +62,9 @@ window.SOUNDS = {}
 
 # Load image resources
 window.IMAGES = {}
+
+# Load other file resources (css, fonts, etc.) as data URLs
+window.RESOURCES = {}
 
 # Load modules - use runPythonSource as it is synchronous
 for module in []:
@@ -113,7 +122,7 @@ def game_loop(now):
 
     
 def draw(t):
-    draw_rect(0, 0, canvas.width, canvas.height, "#000")
+    draw_rect(0, 0, canvas.width, canvas.height, "#fff")
 
     # Draw a square that should be a square no matter the screen size,
     # But scales size with screen width.
@@ -123,7 +132,7 @@ def draw(t):
         canvas.height / 2 - ref_width / 2 + canvas.height / 5 * math.sin(t / 500),
         ref_width,
         ref_width,  
-        "#33a")
+        "#4f46e5") # Blue-ish
 
     # Now draw a square that has a fixed size no matter the screen
     # width or height.
@@ -132,7 +141,7 @@ def draw(t):
         canvas.height/2 + 0.4 * canvas.height * math.sin(t / 1000),
         16,
         16,
-        "#0fc")
+        "#0d9488") # Green-ish
     
 
 resize_canvas(0)

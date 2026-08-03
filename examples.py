@@ -13,31 +13,32 @@ EXAMPLES = {
         ("modules",     "7) Organizing code into modules"),
         ("console",     "8) Simple control flow with async"),
     ],
-    "Interacting with HTML": [
-        ("calculator", "Calculator with styled buttons"),
-        ("sort_table", "Table with sortable columns"),
-        ("sphere", "Decode messages from Sphere"),
-    ],
     "Drawing and animating": [
         ("clock", "Analog clock"),
         ("fonttimer", "Using custom fonts"),
-        ("barcode", "Generate barcodes"),
-        ("pythagoras", "Animated geometry proof"),
-        ("pixelperfect", "Perfect pixel-aligned drawing"),
         ("fullcanvas", "Full screen canvas drawing"),
-        ("springs", "Spring animation with vectors"),
+        ("fullcanvas_fixedresolution", "Full screen fixed resolution"),
+        ("pythagoras", "Animated geometry proof"),
+        ("sidebar_fixedresolution", "Fixed resolution with controls"),
+        ("sidebar_styled", "Now with styled controls"),
+    ],
+    "Using javascript libraries": [
+        ("three", "3D spinning cube (three.js)"),
     ],
     "Embedding resources": [
         ("sound", "Local and remote sounds"),
         ("embedded_resources", "Local fonts and CSS"),
     ],
-    "Games with canvas": [
+    "More HTML/Canvas examples": [
+        ("calculator", "Calculator with styled buttons"),
+        ("sort_table", "Table with sortable columns"),
+        ("sphere", "Decode messages from Sphere"),
+        ("barcode", "Generate barcodes"),
+        ("pixelperfect", "Perfect pixel-aligned drawing"),
+        ("springs", "Spring animation with vectors"),
         ("mobile", "Example using touch events"),
         ("breakout", "Brick breaking"),
         ("lightcycles", "Lightcycles"),
-    ],
-    "Using javascript libraries": [
-        ("three", "3D spinning cube (three.js)"),
     ],
     "Games with pixi.js": [
         ("pixi", "Basic example"),

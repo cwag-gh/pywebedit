@@ -26,7 +26,7 @@ Full screen example game on mobile. Handles touch events.
 </style>
    
 
-<canvas id="gameCanvas" /canvas>
+<canvas id="gameCanvas"></canvas>
 
 
 <script type="text/python" id="brythonpre">
@@ -49,6 +49,9 @@ window.SOUNDS = {}
 
 # Load image resources
 window.IMAGES = {}
+
+# Load other file resources (css, fonts, etc.) as data URLs
+window.RESOURCES = {}
 
 # Load modules - use runPythonSource as it is synchronous
 for module in []:

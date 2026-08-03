@@ -1,0 +1,182 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.2/brython.min.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__ === "undefined" && document.write("<script src=\"brython.min.js\">\x3C/script>")</script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.2/brython_stdlib.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write("<script src=\"brython_stdlib.js\">\x3C/script>")</script>
+
+
+<script type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+}
+</script>
+</head>
+
+<body onload="__brython_pre_then_code()">
+<!--
+Same thing, but we use the pico.css styling we used before. Almost a 
+drop in replacement, but the defaults on the desktop end up being large
+for something like this. So we adjust a few variables.
+-->
+
+<link rel="stylesheet" 
+    href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+<link rel="stylesheet" href="pico.min.css">
+
+<style>
+    :root {                  /* Tune picos defaults to be smaller and denser */
+        --font-size: 14px;   /* Pico defaults to 20px on desktop - too big */
+        --form-element-spacing-vertical: 0.3rem;    /* Box height */
+    }
+    html { background: #f8f8f8; }  /* Page color now must go here, not on body */
+    body { margin: 0; overflow: hidden; }
+    #panel { display: inline-block; vertical-align: top; padding: 8px; }
+    canvas { vertical-align: top; }
+</style>
+
+<canvas id="gameCanvas" width="800" height="600"></canvas>
+<div id="panel">
+    <div><h3>Canvas with sidebar and styling</h3></div>
+    <div>Big shape size <input id="sizeA" value="260" size="5" inputmode="numeric"></div>
+    <div>Small shape size <input id="sizeB" value="16" size="5" inputmode="numeric"></div>
+    <div><select id="shape">
+        <option value="square">Square</option>
+        <option value="circle">Circle</option>
+        <option value="triangle">Triangle</option>
+    </select></div>
+    <div><button id="btn_reset">Reset</button></div>
+</div>
+<script type="text/python" id="brythonpre">
+from browser import document, window
+
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\n" + msg)
+sys.stderr = __ErrorReporter()
+
+# Load sound resouces
+window.SOUNDS = {}
+
+# Load image resources
+window.IMAGES = {}
+
+# Load other file resources (css, fonts, etc.) as data URLs
+window.RESOURCES = {}
+
+# Load modules - use runPythonSource as it is synchronous
+for module in []:
+    __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
+
+# Now run main code
+window.brython({'debug': 1, 'ids': ["pythoncode"]})
+</script>
+
+
+
+<script type="text/python" id="pythoncode">
+import math
+from browser import document, window
+
+# Phones pretend to be ~980px-wide desktop screens unless a viewport
+# meta tag says otherwise; that tag only counts in <head>, and our
+# HTML lands in <body>, so we create it from code.
+if not document.querySelector("meta[name=viewport]"):
+    meta = document.createElement("meta")
+    meta.name = "viewport"
+    meta.content = "width=device-width, initial-scale=1"
+    document.head.appendChild(meta)
+
+canvas = document.getElementById("gameCanvas")
+ctx = canvas.getContext("2d")
+panel = document.getElementById("panel")
+
+GAME_W = canvas.width
+GAME_H = canvas.height
+
+DEFAULTS = {"sizeA": "260", "sizeB": "16"}
+t0 = 0
+
+def resize_canvas(_):
+    landscape = window.innerWidth > window.innerHeight
+    if landscape:
+        # Canvas and panel share a line. The -8 is slack for the
+        # whitespace between them in the HTML, so the panel never
+        # wraps when it should sit beside the canvas.
+        avail_w = window.innerWidth - panel.offsetWidth - 8
+        avail_h = window.innerHeight
+    else:
+        # Canvas gets the full width; panel wraps below it.
+        avail_w = window.innerWidth
+        avail_h = window.innerHeight - panel.offsetHeight
+        
+    scale = max(0.05, min(avail_w / GAME_W, avail_h / GAME_H))
+    canvas.style.width = f"{GAME_W * scale}px"
+    canvas.style.height = f"{GAME_H * scale}px"
+
+def read_number(el_id):
+    try:
+        return float(document.getElementById(el_id).value)
+    except ValueError:
+        return float(DEFAULTS[el_id])
+
+def reset(_):
+    global t0
+    t0 = window.performance.now()
+    for el_id, value in DEFAULTS.items():
+        document.getElementById(el_id).value = value
+    document.getElementById("shape").value = "square"
+
+def draw_shape(kind, cx, cy, size, color):
+    ctx.fillStyle = color
+    if kind == "square":
+        ctx.fillRect(cx - size / 2, cy - size / 2, size, size)
+    elif kind == "circle":
+        ctx.beginPath()
+        ctx.arc(cx, cy, size / 2, 0, 2 * math.pi)
+        ctx.fill()
+    elif kind == "triangle":
+        ctx.beginPath()
+        ctx.moveTo(cx, cy - size / 2)
+        ctx.lineTo(cx + size / 2, cy + size / 2)
+        ctx.lineTo(cx - size / 2, cy + size / 2)
+        ctx.fill()
+
+def game_loop(now):
+    draw(now)
+    window.requestAnimationFrame(game_loop)
+
+def draw(t):
+    t = t - t0
+    kind = document.getElementById("shape").value
+    size_a = read_number("sizeA")
+    size_b = read_number("sizeB")
+
+    ctx.fillStyle = "#ffffff"      # game background
+    ctx.fillRect(0, 0, GAME_W, GAME_H)
+    draw_shape(kind,
+               GAME_W / 2,
+               GAME_H / 2 + GAME_H / 5 * math.sin(t / 500),
+               size_a, "#4f46e5")
+    draw_shape(kind,
+               GAME_W / 2 + 0.4 * GAME_W * math.cos(t / 1000),
+               GAME_H / 2 + 0.4 * GAME_H * math.sin(t / 1000),
+               size_b, "#0d9488")
+
+document.getElementById("btn_reset").addEventListener("click", reset)
+resize_canvas(0)
+window.addEventListener("resize", resize_canvas)
+game_loop(0)
+</script>
+</body>
+</html>

@@ -1,0 +1,122 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.2/brython.min.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__ === "undefined" && document.write("<script src=\"brython.min.js\">\x3C/script>")</script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.2/brython_stdlib.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write("<script src=\"brython_stdlib.js\">\x3C/script>")</script>
+
+
+<script type="text/javascript">
+function __brython_pre_then_code() {
+  brython({debug:1, ids:["brythonpre"]});
+}
+</script>
+</head>
+
+<body onload="__brython_pre_then_code()">
+<!--
+This example goes back to using a fixed-resolution game canvas
+(size set by the width/height attributes below), but now we
+scale to fit the screen with letterboxing. The body background color
+is the letterbox color, and display: flex lets us keep the canvas 
+centered.
+
+Scaling is smooth (anti-aliased) by default. For crisp pixel art, add:
+
+    canvas { image-rendering: pixelated; }
+
+in between the style tags below, and round() the x, y, w, h inside 
+draw_rect so shapes land on whole pixels in the game canvas too.
+-->
+<style>
+    * { margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+        background: #dbe1e8;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+</style>
+
+<canvas id="gameCanvas" width="800" height="600"></canvas>
+
+<script type="text/python" id="brythonpre">
+from browser import document, window
+
+import sys
+class __ErrorReporter:
+    def __init__(self):
+        self.errdiv = None
+    def write(self, msg):
+        if self.errdiv is None:
+            self.errdiv = document.createElement("div")
+            self.errdiv.style = "white-space: pre-wrap; font-family: monospace; color:red"
+            document.body.insertBefore(self.errdiv, document.body.firstChild)
+        self.errdiv.textContent += ("\n" + msg)
+sys.stderr = __ErrorReporter()
+
+# Load sound resouces
+window.SOUNDS = {}
+
+# Load image resources
+window.IMAGES = {}
+
+# Load other file resources (css, fonts, etc.) as data URLs
+window.RESOURCES = {}
+
+# Load modules - use runPythonSource as it is synchronous
+for module in []:
+    __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
+
+# Now run main code
+window.brython({'debug': 1, 'ids': ["pythoncode"]})
+</script>
+
+
+
+<script type="text/python" id="pythoncode">
+import math
+from browser import document, window
+
+canvas = document.getElementById("gameCanvas")
+ctx = canvas.getContext("2d")
+
+# Resolution comes from the HTML attributes - one source of truth.
+GAME_W = canvas.width
+GAME_H = canvas.height
+
+def resize_canvas(_):
+    # Each screen dimension limits how big the frame can get;
+    # the smaller limit wins, so both dimensions always fit.
+    scale = min(window.innerWidth / GAME_W, window.innerHeight / GAME_H)
+    canvas.style.width = f"{GAME_W * scale}px"
+    canvas.style.height = f"{GAME_H * scale}px"
+
+def draw_rect(x, y, w, h, color):
+    ctx.fillStyle = color
+    ctx.fillRect(x, y, w, h)
+
+def game_loop(now):
+    draw(now)
+    window.requestAnimationFrame(game_loop)
+
+def draw(t):
+    draw_rect(0, 0, GAME_W, GAME_H, "#fff")
+    size = GAME_W / 3
+    draw_rect(GAME_W / 2 - size / 2,
+              GAME_H / 2 - size / 2 + GAME_H / 5 * math.sin(t / 500),
+              size, size, "#4f46e5")
+    draw_rect(GAME_W / 2 + 0.4 * GAME_W * math.cos(t / 1000),
+              GAME_H / 2 + 0.4 * GAME_H * math.sin(t / 1000),
+              16, 16, "#0d9488")
+
+resize_canvas(0)
+window.addEventListener("resize", resize_canvas)
+game_loop(0)
+</script>
+</body>
+</html>

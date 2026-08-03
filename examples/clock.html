@@ -1,10 +1,13 @@
-
 <!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
-<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython.min.js"></script>
-<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.0/brython_stdlib.js"></script>
+
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.2/brython.min.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__ === "undefined" && document.write("<script src=\"brython.min.js\">\x3C/script>")</script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.13.2/brython_stdlib.js" crossorigin="anonymous"></script>
+<script> typeof __BRYTHON__.use_VFS === "undefined" && document.write("<script src=\"brython_stdlib.js\">\x3C/script>")</script>
+
 
 <script type="text/javascript">
 function __brython_pre_then_code() {
@@ -14,6 +17,14 @@ function __brython_pre_then_code() {
 </head>
 
 <body onload="__brython_pre_then_code()">
+<!-- A simple clock example.
+
+We use the canvas element to draw into. By specifying
+the width and height of the canvas in the canvas element,
+that sets the pixels of the drawing surface - not necessarily
+how many pixels it takes up on screen.
+-->
+
 <p>
 <canvas width="250" height="250" id="clock">
 Your browser doesn't support Canvas
@@ -34,8 +45,24 @@ class __ErrorReporter:
         self.errdiv.textContent += ("\n" + msg)
 sys.stderr = __ErrorReporter()
 
+# Load sound resouces
+window.SOUNDS = {}
+
+# Load image resources
+window.IMAGES = {}
+
+# Load other file resources (css, fonts, etc.) as data URLs
+window.RESOURCES = {}
+
+# Load modules - use runPythonSource as it is synchronous
+for module in []:
+    __BRYTHON__.runPythonSource(document[module].text, module.replace('__pwe_', ''))
+
+# Now run main code
 window.brython({'debug': 1, 'ids': ["pythoncode"]})
 </script>
+
+
 
 <script type="text/python" id="pythoncode">
 # Analog clock demo written in Brython (www.brython.info)

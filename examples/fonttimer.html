@@ -20,7 +20,9 @@ function __brython_pre_then_code() {
 <!-- This shows how to use custom fonts in your webpage.
 You can use it in the page itself or use it in a canvas element.
 
-Unfortunately, this (currently) relies on web access.
+This approach currently relies on web access. Later we will
+show how to use pywebedit's features to embed the font for
+offline access as well.
 -->
 <link href="https://fonts.cdnfonts.com/css/orbitron" rel="stylesheet">
 
@@ -53,6 +55,9 @@ window.SOUNDS = {}
 
 # Load image resources
 window.IMAGES = {}
+
+# Load other file resources (css, fonts, etc.) as data URLs
+window.RESOURCES = {}
 
 # Load modules - use runPythonSource as it is synchronous
 for module in []:
@@ -100,6 +105,11 @@ def draw_text(text, x, y, color='black', font_size=12, font_family='Arial',
 
 
 async def main():
+    # Ask the browser to fetch the font and wait until it's actually
+    # usable. The size in the string is just shorthand syntax;
+    # loading any size loads the whole font.
+    await document.fonts.load("150px orbitron")
+    
     while True:
         clear()
         now = datetime.now()
@@ -114,10 +124,7 @@ async def main():
         await aio.sleep(0.1)
 
 
-# Start font load early by drawing something blank
-draw_text(' ', 100, 100, font_family="orbitron")
-# Then, start the run only after fonts are loaded
-document.fonts.ready.then(aio.run(main()))
+aio.run(main())
 
 </script>
 </body>
